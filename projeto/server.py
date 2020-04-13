@@ -83,9 +83,13 @@ def invalid_msg(msg_request):
   return server_msg
 
 #main code
+#threads = []
+
+#connections = {}  guardar infos das ligacoes antes de fazerem register: formato -> 
 
 active_users = {} #dict: key: user_name; val:user_address info: example:'maria'= ('127.0.0.1',17234)
 
+# programa inicial, nao e thread
 server_sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 
 server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # para depois poder matar com ctrl+c
@@ -93,29 +97,67 @@ server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # para depois 
 server_sock.bind(('', SERVER_PORT))
 
 
-
 server_sock.listen(5)
 
+
+
+
+
 server_sock, client_addr = server_sock.accept() 
-    # fazer um socket listen aqui
-while True:
-    (client_msg, client_addr) = server_sock.recvfrom(MSG_SIZE)
-    print("Passou")
-    msg_request = client_msg.decode().split()
-    print(msg_request)
-    request_type = msg_request[TYPE]
-    if(request_type == "IAM"):
-        server_msg = register_client(msg_request, client_addr, active_users)
-    elif(request_type == "HELLO"):
-        server_msg = reply_hello(client_addr, active_users)
-    elif(request_type == "HELLOTO"):
-        (server_msg, client_addr) = forward_hello(msg_request, client_addr, active_users)
-    elif(request_type == "KILLSERVER"):
-        server_msg = "KILL".encode()
+
+
+
+
+    #while True:
+        #server_sock, client_addr = server_sock.accept()
+        # a parte de cima guardamos num buffer para se outra thread abrir depois e registar primeiro?
+        #cliente = threading.Thread(target=server)
+        #threads.append(cliente)
+        #cliente.start()
+    while True:
+        (client_msg, client_addr) = server_sock.recvfrom(MSG_SIZE)
+        print("Passou")
+        msg_request = client_msg.decode().split()
+        print(msg_request)
+        request_type = msg_request[TYPE]
+        if(request_type == "IAM"):
+            server_msg = register_client(msg_request, client_addr, active_users)
+        elif(request_type == "HELLO"):
+            server_msg = reply_hello(client_addr, active_users)
+        elif(request_type == "HELLOTO"):
+            (server_msg, client_addr) = forward_hello(msg_request, client_addr, active_users)
+        elif(request_type == "KILLSERVER"):
+            server_msg = "KILL".encode()
+            server_sock.send(server_msg)
+            break
+        else:
+            server_msg = invalid_msg(msg_request)
+        #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
         server_sock.send(server_msg)
-        break
-    else:
-        server_msg = invalid_msg(msg_request)
-    #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
-    server_sock.send(server_msg)
-server_sock.close()
+    server_sock.close()
+
+
+#def server():
+"""
+        while True:
+        (client_msg, client_addr) = server_sock.recvfrom(MSG_SIZE)
+        print("Passou")
+        msg_request = client_msg.decode().split()
+        print(msg_request)
+        request_type = msg_request[TYPE]
+        if(request_type == "IAM"):
+            server_msg = register_client(msg_request, client_addr, active_users)
+        elif(request_type == "HELLO"):
+            server_msg = reply_hello(client_addr, active_users)
+        elif(request_type == "HELLOTO"):
+            (server_msg, client_addr) = forward_hello(msg_request, client_addr, active_users)
+        elif(request_type == "KILLSERVER"):
+            server_msg = "KILL".encode()
+            server_sock.send(server_msg)
+            break
+        else:
+            server_msg = invalid_msg(msg_request)
+        #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
+        server_sock.send(server_msg)
+    server_sock.close()
+    """
