@@ -1,4 +1,5 @@
 import socket
+import threading
 
 
 # Recebe no porto SERVER PORT os comandos "IAM <nome>", "HELLO",
@@ -82,8 +83,34 @@ def invalid_msg(msg_request):
   server_msg = msg_reply.encode()
   return server_msg
 
+
+
+def server_function(client_socket):
+    while True:
+        (client_msg, client_addr) = client_socket.recvfrom(MSG_SIZE)
+        print("Passou")
+        msg_request = client_msg.decode().split()
+        print(msg_request)
+        request_type = msg_request[TYPE]
+        if(request_type == "IAM"):
+            server_msg = register_client(msg_request, client_addr, active_users)
+        elif(request_type == "HELLO"):
+            server_msg = reply_hello(client_addr, active_users)
+        elif(request_type == "HELLOTO"):
+            (server_msg, client_addr) = forward_hello(msg_request, client_addr, active_users)
+        elif(request_type == "KILLSERVER"):
+            server_msg = "KILL".encode()
+            server_sock.send(server_msg)
+            break
+        else:
+            server_msg = invalid_msg(msg_request)
+        #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
+        client_socket.send(server_msg)
+    client_socket.close()
+
+
 #main code
-#threads = []
+threads = []
 
 #connections = {}  guardar infos das ligacoes antes de fazerem register: formato -> 
 
@@ -102,39 +129,13 @@ server_sock.listen(5)
 
 
 
+while True:
+    client_sock, client_addr = server_sock.accept()
+    #a parte de cima guardamos num buffer para se outra thread abrir depois e registar primeiro?
+    cliente = threading.Thread(target=server_function, args = (client_sock,))
+    threads.append(cliente)
+    cliente.start()
 
-server_sock, client_addr = server_sock.accept() 
-
-
-
-
-    #while True:
-        #server_sock, client_addr = server_sock.accept()
-        # a parte de cima guardamos num buffer para se outra thread abrir depois e registar primeiro?
-        #cliente = threading.Thread(target=server)
-        #threads.append(cliente)
-        #cliente.start()
-    while True:
-        (client_msg, client_addr) = server_sock.recvfrom(MSG_SIZE)
-        print("Passou")
-        msg_request = client_msg.decode().split()
-        print(msg_request)
-        request_type = msg_request[TYPE]
-        if(request_type == "IAM"):
-            server_msg = register_client(msg_request, client_addr, active_users)
-        elif(request_type == "HELLO"):
-            server_msg = reply_hello(client_addr, active_users)
-        elif(request_type == "HELLOTO"):
-            (server_msg, client_addr) = forward_hello(msg_request, client_addr, active_users)
-        elif(request_type == "KILLSERVER"):
-            server_msg = "KILL".encode()
-            server_sock.send(server_msg)
-            break
-        else:
-            server_msg = invalid_msg(msg_request)
-        #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
-        server_sock.send(server_msg)
-    server_sock.close()
 
 
 #def server():
