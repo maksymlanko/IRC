@@ -57,7 +57,7 @@ def register_client(msg_request, active_users, client_socket):
     # register the user
     active_users[name] = client_socket
     server_msg = msg_reply.encode()
-    return(server_msg)
+    return server_msg
 
 
 def reply_hello(active_users, client_socket):
@@ -68,17 +68,22 @@ def reply_hello(active_users, client_socket):
     server_msg = msg_reply.encode()
     return(server_msg)
 
-def forward_hello(msg_request, addr, active_users):
+def forward_hello(msg_request, active_users, client_socket):
     dst_name = msg_request[USER_ID]
-    src_name =  find_client(addr, active_users)
-    msg_reply = NOT_OK + INV_SESSION + "\n"
+    src_name =  find_client(client_socket, active_users)
+    server_msg = NOT_OK + INV_SESSION + "\n"
     for key, val in list(active_users.items()):
         if key == dst_name:
-            msg_reply = 'HELLO'   + ' ' + dst_name + ' from ' + src_name +"\n"
+            server_msg = 'HELLO'   + ' ' + dst_name + ' from ' + src_name +"\n"
             addr = active_users[dst_name]
             break
-    server_msg = msg_reply.encode()
-    return(server_msg, addr)
+    server_reply = "No user with that name!"
+    if key == dst_name:
+        server_msg = server_msg.encode()
+        addr.send(server_msg)
+        server_reply = "Your message has been delivered"
+    server_reply = server_reply.encode()
+    return server_reply
 
 def invalid_msg(msg_request):
   respond_msg = "INVALID MESSAGE\n"
@@ -100,7 +105,7 @@ def server_function(client_socket):
         elif(request_type == "HELLO"):
             server_msg = reply_hello(active_users, client_socket)
         elif(request_type == "HELLOTO"):
-            (server_msg, client_addr) = forward_hello(msg_request, client_addr, active_users)
+            server_msg = forward_hello(msg_request, active_users, client_socket)
         elif(request_type == "KILLSERVER"):
             server_msg = "KILL".encode()
             server_sock.send(server_msg)
