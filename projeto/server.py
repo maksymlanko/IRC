@@ -40,26 +40,29 @@ def find_client (addr, active_users):
     return NULL
 
 #message handling functions
-def register_client(msg_request, addr, active_users):
+def register_client(msg_request, active_users, client_socket):
     name = msg_request[USER_ID]
     msg_reply = OK + REG_OK + "\n"
     # delete existing users
+    """
     if name in active_users:
         active_users.pop(name)
         msg_reply = OK + REG_UPDATED + "\n"
+    
     dst_name = find_client(addr, active_users)
     if (dst_name != NULL):
         active_users.pop(dst_name)
         msg_reply = OK + REG_UPDATED + "\n"
+    """
     # register the user
-    active_users[name] = addr
+    active_users[name] = client_socket
     server_msg = msg_reply.encode()
     return(server_msg)
 
 
-def reply_hello(addr, active_users):
+def reply_hello(active_users, client_socket):
     msg_reply = NOT_OK + INV_CLIENT + "\n"
-    dst_name = find_client(addr, active_users)
+    dst_name = find_client(client_socket, active_users)
     if (dst_name != NULL):
         msg_reply = 'HELLO' + ' ' + dst_name + "\n"
     server_msg = msg_reply.encode()
@@ -87,15 +90,15 @@ def invalid_msg(msg_request):
 
 def server_function(client_socket):
     while True:
-        (client_msg, client_addr) = client_socket.recvfrom(MSG_SIZE)
+        client_msg = client_socket.recv(MSG_SIZE)
         print("Passou")
         msg_request = client_msg.decode().split()
         print(msg_request)
         request_type = msg_request[TYPE]
         if(request_type == "IAM"):
-            server_msg = register_client(msg_request, client_addr, active_users)
+            server_msg = register_client(msg_request, active_users, client_socket)
         elif(request_type == "HELLO"):
-            server_msg = reply_hello(client_addr, active_users)
+            server_msg = reply_hello(active_users, client_socket)
         elif(request_type == "HELLOTO"):
             (server_msg, client_addr) = forward_hello(msg_request, client_addr, active_users)
         elif(request_type == "KILLSERVER"):
@@ -131,6 +134,8 @@ server_sock.listen(5)
 
 while True:
     client_sock, client_addr = server_sock.accept()
+    print(client_sock)
+    print(client_addr)
     #a parte de cima guardamos num buffer para se outra thread abrir depois e registar primeiro?
     cliente = threading.Thread(target=server_function, args = (client_sock,))
     threads.append(cliente)

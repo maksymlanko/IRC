@@ -29,7 +29,7 @@ while True:
         client_sock.send(client_msg)
     # i == sock - o servidor enviou uma mensagem para o socket
     elif i == client_sock:
-        (server_msg,addr) = client_sock.recvfrom(MSG_SIZE)
+        server_msg = client_sock.recv(MSG_SIZE)
         server_request = server_msg.decode()
         print("Message received from server:", server_request)
         if server_request == "KILL":
