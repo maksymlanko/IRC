@@ -104,6 +104,12 @@ def invalid_msg(msg_request):
   return server_msg
 
 
+def exit_session(active_users, client_socket):
+    name = find_client(client_socket, active_users)
+    del active_users[name]
+    return EXIT.encode()
+
+
 def server_function(client_socket):
     while True:
         client_msg = client_socket.recv(MSG_SIZE)
@@ -118,7 +124,7 @@ def server_function(client_socket):
         elif(request_type == "HELLOTO"):
             server_msg = forward_hello(msg_request, active_users, client_socket)
         elif(request_type == "EXIT"):
-            server_msg = "KILL".encode()
+            server_msg = exit_session(active_users, client_socket)
             client_socket.send(server_msg)
             break
         else:

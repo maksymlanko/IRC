@@ -2,6 +2,8 @@ import socket
 import sys
 import select
 
+EXIT        = 'you have ended your session'
+
 
 #sockets communication parameters
 SERVER_PORT = 12100
@@ -32,5 +34,5 @@ while True:
         server_msg = client_sock.recv(MSG_SIZE)
         server_request = server_msg.decode()
         print("Message received from server:", server_request)
-        if server_request == "KILL":
+        if server_request == EXIT:
           exit()
