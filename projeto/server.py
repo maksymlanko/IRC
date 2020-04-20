@@ -33,78 +33,78 @@ INV_MSG     = 'invalid message type'
 REG_USED    = 'client with that name already exists'
 HAS_SESSION = 'you already have a session, '
 EXIT        = 'you have ended your session'
+NOTHING     = 'has done nothing'
+NO_USER     = 'No user with that name!'
+ACK         = 'Your message has been delivered'
 
 #generic functions
 
-def find_client (addr):
+def find_addr (addr): # pede addr
     for key, val in list(active_users.items()):
         if val == addr:
             return key
     return NULL
 
-#message handling functions
+def find_name(name): # pede name
+    for key, val in list(active_users.items()):
+        if key == name:
+            return active_users[name]
+    return NULL
+
+
 def register_client(msg_request, client_socket):
     name = msg_request[ARGUMENT]
-    msg_reply = OK + REG_OK + "\n"
-        
-    if name in active_users:
-        msg_reply = NOT_OK + REG_USED + "\n"
-        server_msg = msg_reply.encode()
-        return server_msg
+    msg_reply = NOT_OK + NOTHING + "\n"
+    client_name = find_addr(client_socket)
 
-    dst_name = find_client(client_socket)
-    if (dst_name != NULL):
-        msg_reply = NOT_OK + HAS_SESSION + dst_name + "\n"
-        server_msg = msg_reply.encode()
-        return server_msg
-    
-    # register the user
-    active_users[name] = client_socket
-    server_msg = msg_reply.encode()
-    return server_msg
+    if (client_name != NULL):
+        msg_reply = NOT_OK + HAS_SESSION + client_name + "\n"
+    elif name in active_users: 
+        msg_reply = NOT_OK + REG_USED + "\n"
+    else:
+        active_users[name] = client_socket
+        msg_reply = OK + REG_OK + "\n"
+
+    return msg_reply
 
 
 def reply_hello(client_socket):
     msg_reply = NOT_OK + INV_CLIENT + "\n"
-    dst_name = find_client(client_socket)
-    if (dst_name != NULL):
+    dst_name = find_addr(client_socket)
+
+    if dst_name != NULL:
         msg_reply = 'HELLO' + ' ' + dst_name + "\n"
-    server_msg = msg_reply.encode()
-    return(server_msg)
+
+    return msg_reply
+
 
 def forward_hello(msg_request, client_socket):
     dst_name = msg_request[ARGUMENT]
-    src_name =  find_client(client_socket)
-    server_msg = NOT_OK + INV_SESSION + "\n"
-    for key, val in list(active_users.items()):
-        if key == src_name:
-            break
-    if key != src_name:
-        server_reply = NOT_OK + INV_SESSION
+    dst_addr = find_name(dst_name)
+    msg_reply = NOT_OK + INV_SESSION + "\n"
+    src_name =  find_addr(client_socket)
+
+    if src_name == NULL:
+        msg_reply = NOT_OK + INV_SESSION
+    elif dst_addr == NULL:
+        msg_reply = NO_USER + "\n"
+    else:
+        msg_reply = OK + ACK + "\n"
+        server_reply = 'HELLO'   + ' ' + dst_name + ' from ' + src_name + "\n"
         server_reply = server_reply.encode()
-        return server_reply
-    for key, val in list(active_users.items()):
-        if key == dst_name:
-            server_msg = 'HELLO'   + ' ' + dst_name + ' from ' + src_name +"\n"
-            addr = active_users[dst_name]
-            break
-    server_reply = "No user with that name!"
-    if key == dst_name:
-        server_msg = server_msg.encode()
-        addr.send(server_msg)
-        server_reply = "Your message has been delivered"
-    server_reply = server_reply.encode()
-    return server_reply
+        dst_addr.send(server_reply)
+
+    return msg_reply
+
 
 def invalid_msg(msg_request):
   respond_msg = "INVALID MESSAGE\n"
   msg_reply = NOT_OK + msg_request[COMMAND] + ' ' + INV_MSG + "\n"
-  server_msg = msg_reply.encode()
-  return server_msg
+  return msg_reply
 
 
 def exit_session(client_socket):
-    name = find_client(client_socket)
+    name = find_addr(client_socket)
     del active_users[name]
     return EXIT.encode()
 
@@ -123,11 +123,13 @@ def server_function(client_socket):
             server_msg = forward_hello(msg_request, client_socket)
         elif(command == "EXIT"):
             server_msg = exit_session(client_socket)
+            server_msg = msg_reply.encode()
             client_socket.send(server_msg)
             break
         else:
             server_msg = invalid_msg(msg_request)
         #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
+        server_msg = server_msg.encode()
         client_socket.send(server_msg)
     client_socket.close()
 
