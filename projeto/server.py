@@ -28,7 +28,7 @@ REG_OK      = 'client successfully registered'
 REG_UPDATED = 'client registration updated'
 REG_NOT_OK  = 'client unsuccessfully registered'
 INV_CLIENT  = 'client is not registered' # invalid client
-INV_SESSION = 'client has no active session'  #no active session for the client"
+INV_SESSION = 'client has no status session'  #no status session for the client"
 INV_MSG     = 'invalid message type'
 REG_USED    = 'client with that name already exists'
 HAS_SESSION = 'you already have a session, '
@@ -37,6 +37,12 @@ NOTHING     = 'has done nothing'
 NO_USER     = 'No user with that name!'
 ACK         = 'Your message has been delivered'
 FREE        = 'free'
+BUSY        = 'busy'
+PLAYING     = 'playing'
+ACCEPT      = 'you are in a game now!'
+ACCEPTED    = 'you are in a game now!'
+DECLINE     = 'you declined the game invite'
+DECLINED    = 'the player declined your invite'
 
 #generic functions
 
@@ -64,7 +70,7 @@ def register_client(msg_request, client_socket):
         msg_reply = NOT_OK + REG_USED + "\n"
     else:
         users[name] = client_socket
-        active[name] = FREE
+        status[name] = FREE
         msg_reply = OK + REG_OK + "\n"
 
     return msg_reply
@@ -99,13 +105,41 @@ def forward_hello(msg_request, client_socket):
     return msg_reply
 
 
-def show_active(client_socket):
+def show_status(client_socket):
     msg_reply = OK + '\n'
-    for key, val in list(active.items()):
-        if active[key] == FREE:
-            msg_reply += key + '\n'
+    for key, val in list(status.items()): #fazer funcao
+        if status[key] == FREE:
+            msg_reply += key + ': free\n'
+    for key, val in list(status.items()): #fazer funcao
+        if status[key] == BUSY:
+            msg_reply += key + ': busy\n'
     return msg_reply
 
+
+def invite(msg_request, client_socket):
+    dst_name = msg_request[ARGUMENT]
+    status[dst_name] = BUSY
+    invited_socket = find_name(dst_name)
+    src_name = find_addr(client_socket)
+    status[src_name] = BUSY
+    server_reply = " You have been invited to a game by: " + src_name + ". (Y/n)"
+    server_reply = server_reply.encode() #fazer uma funcao auxiliar que faz estas 2 linhas depois
+    invited_socket.send(server_reply)
+    msg_reply = OK + ACK + '\n'
+
+    return msg_reply
+
+
+def update_status(accepted, client_socket):
+    dst_name = find_addr(client_socket)
+    
+    status[dst_name] = PLAYING # mudar todos if else para este formato?
+    msg_reply = OK + ACCEPT
+    if accepted == "N":
+        status[dst_name] = FREE
+        msg_reply = OK + DECLINE
+
+    return msg_reply
 
 def invalid_msg(msg_request):
   respond_msg = "INVALID MESSAGE\n"
@@ -115,7 +149,8 @@ def invalid_msg(msg_request):
 
 def exit_session(client_socket):
     name = find_addr(client_socket)
-    del active_users[name]
+    del users[name]
+    del status[name]
     return EXIT.encode()
 
 
@@ -132,7 +167,13 @@ def server_function(client_socket):
         elif(command == "HELLOTO"):
             server_msg = forward_hello(msg_request, client_socket)
         elif(command == "LIST"):
-            server_msg = show_active(client_socket)
+            server_msg = show_status(client_socket)
+        elif(command == "INVITE"):
+            server_msg = invite(msg_request, client_socket)
+        elif(command.upper() == "Y" or command.upper() == "N"):
+            client_name = find_addr(client_socket)
+            if status[client_name] == BUSY:
+                server_msg = update_status(command.upper(), client_socket)
         elif(command == "EXIT"):
             server_msg = exit_session(client_socket)
             server_msg = msg_reply.encode()
@@ -149,7 +190,7 @@ def server_function(client_socket):
 #main code
 threads = []
 users = {} #dict: key: user_name; val:user_address info: example:'maria'= ('127.0.0.1',17234)
-active = {}
+status = {}
 # programa inicial, nao e thread
 server_sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # para depois poder matar com ctrl+c
