@@ -36,19 +36,20 @@ EXIT        = 'you have ended your session'
 NOTHING     = 'has done nothing'
 NO_USER     = 'No user with that name!'
 ACK         = 'Your message has been delivered'
+FREE        = 'free'
 
 #generic functions
 
 def find_addr (addr): # pede addr
-    for key, val in list(active_users.items()):
+    for key, val in list(users.items()):
         if val == addr:
             return key
     return NULL
 
 def find_name(name): # pede name
-    for key, val in list(active_users.items()):
+    for key, val in list(users.items()):
         if key == name:
-            return active_users[name]
+            return users[name]
     return NULL
 
 
@@ -59,10 +60,11 @@ def register_client(msg_request, client_socket):
 
     if (client_name != NULL):
         msg_reply = NOT_OK + HAS_SESSION + client_name + "\n"
-    elif name in active_users: 
+    elif name in users: 
         msg_reply = NOT_OK + REG_USED + "\n"
     else:
-        active_users[name] = client_socket
+        users[name] = client_socket
+        active[name] = FREE
         msg_reply = OK + REG_OK + "\n"
 
     return msg_reply
@@ -97,6 +99,14 @@ def forward_hello(msg_request, client_socket):
     return msg_reply
 
 
+def show_active(client_socket):
+    msg_reply = OK + '\n'
+    for key, val in list(active.items()):
+        if active[key] == FREE:
+            msg_reply += key + '\n'
+    return msg_reply
+
+
 def invalid_msg(msg_request):
   respond_msg = "INVALID MESSAGE\n"
   msg_reply = NOT_OK + msg_request[COMMAND] + ' ' + INV_MSG + "\n"
@@ -121,6 +131,8 @@ def server_function(client_socket):
             server_msg = reply_hello(client_socket)
         elif(command == "HELLOTO"):
             server_msg = forward_hello(msg_request, client_socket)
+        elif(command == "LIST"):
+            server_msg = show_active(client_socket)
         elif(command == "EXIT"):
             server_msg = exit_session(client_socket)
             server_msg = msg_reply.encode()
@@ -136,7 +148,8 @@ def server_function(client_socket):
 
 #main code
 threads = []
-active_users = {} #dict: key: user_name; val:user_address info: example:'maria'= ('127.0.0.1',17234)
+users = {} #dict: key: user_name; val:user_address info: example:'maria'= ('127.0.0.1',17234)
+active = {}
 # programa inicial, nao e thread
 server_sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # para depois poder matar com ctrl+c
