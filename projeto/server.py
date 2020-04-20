@@ -16,8 +16,8 @@ SERVER_PORT = 12100
 MSG_SIZE = 1024
 
 #message info
-TYPE = 0
-USER_ID = 1
+COMMAND = 0
+ARGUMENT = 1
 
 #return codes
 OK          = 'OK: '
@@ -36,24 +36,23 @@ EXIT        = 'you have ended your session'
 
 #generic functions
 
-def find_client (addr, active_users):
+def find_client (addr):
     for key, val in list(active_users.items()):
         if val == addr:
             return key
     return NULL
 
 #message handling functions
-def register_client(msg_request, active_users, client_socket):
-    name = msg_request[USER_ID]
+def register_client(msg_request, client_socket):
+    name = msg_request[ARGUMENT]
     msg_reply = OK + REG_OK + "\n"
-    # delete existing users
-    
+        
     if name in active_users:
         msg_reply = NOT_OK + REG_USED + "\n"
         server_msg = msg_reply.encode()
         return server_msg
 
-    dst_name = find_client(client_socket, active_users)
+    dst_name = find_client(client_socket)
     if (dst_name != NULL):
         msg_reply = NOT_OK + HAS_SESSION + dst_name + "\n"
         server_msg = msg_reply.encode()
@@ -65,17 +64,17 @@ def register_client(msg_request, active_users, client_socket):
     return server_msg
 
 
-def reply_hello(active_users, client_socket):
+def reply_hello(client_socket):
     msg_reply = NOT_OK + INV_CLIENT + "\n"
-    dst_name = find_client(client_socket, active_users)
+    dst_name = find_client(client_socket)
     if (dst_name != NULL):
         msg_reply = 'HELLO' + ' ' + dst_name + "\n"
     server_msg = msg_reply.encode()
     return(server_msg)
 
-def forward_hello(msg_request, active_users, client_socket):
-    dst_name = msg_request[USER_ID]
-    src_name =  find_client(client_socket, active_users)
+def forward_hello(msg_request, client_socket):
+    dst_name = msg_request[ARGUMENT]
+    src_name =  find_client(client_socket)
     server_msg = NOT_OK + INV_SESSION + "\n"
     for key, val in list(active_users.items()):
         if key == src_name:
@@ -99,13 +98,13 @@ def forward_hello(msg_request, active_users, client_socket):
 
 def invalid_msg(msg_request):
   respond_msg = "INVALID MESSAGE\n"
-  msg_reply = NOT_OK + msg_request[TYPE] + ' ' + INV_MSG + "\n"
+  msg_reply = NOT_OK + msg_request[COMMAND] + ' ' + INV_MSG + "\n"
   server_msg = msg_reply.encode()
   return server_msg
 
 
-def exit_session(active_users, client_socket):
-    name = find_client(client_socket, active_users)
+def exit_session(client_socket):
+    name = find_client(client_socket)
     del active_users[name]
     return EXIT.encode()
 
@@ -113,18 +112,17 @@ def exit_session(active_users, client_socket):
 def server_function(client_socket):
     while True:
         client_msg = client_socket.recv(MSG_SIZE)
-        print("Passou")
+        print(client_msg.decode())
         msg_request = client_msg.decode().split()
-        print(msg_request)
-        request_type = msg_request[TYPE]
-        if(request_type == "IAM"):
-            server_msg = register_client(msg_request, active_users, client_socket)
-        elif(request_type == "HELLO"):
-            server_msg = reply_hello(active_users, client_socket)
-        elif(request_type == "HELLOTO"):
-            server_msg = forward_hello(msg_request, active_users, client_socket)
-        elif(request_type == "EXIT"):
-            server_msg = exit_session(active_users, client_socket)
+        command = msg_request[COMMAND]
+        if(command == "IAM"): # se command 2 for NULL breaka
+            server_msg = register_client(msg_request, client_socket)
+        elif(command == "HELLO"):
+            server_msg = reply_hello(client_socket)
+        elif(command == "HELLOTO"):
+            server_msg = forward_hello(msg_request, client_socket)
+        elif(command == "EXIT"):
+            server_msg = exit_session(client_socket)
             client_socket.send(server_msg)
             break
         else:
@@ -146,9 +144,6 @@ server_sock.listen(5)
 
 while True:
     client_sock, client_addr = server_sock.accept()
-    print(client_sock)
-    print(client_addr)
-    #a parte de cima guardamos num buffer para se outra thread abrir depois e registar primeiro?
     cliente = threading.Thread(target=server_function, args = (client_sock,))
     threads.append(cliente)
     cliente.start()
