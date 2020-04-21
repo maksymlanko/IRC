@@ -14,13 +14,18 @@ NULL = ''
 #sockets communication parameters
 SERVER_PORT = 12100
 MSG_SIZE = 1024
+NUMBER_OF_POSITIONS = 3
 
 #message info
 COMMAND = 0
 ARGUMENT = 1
+
 SOCKET  = 0
 STATUS  = 1
 INVITED = 2
+INGAME  = 3
+SYMBOL  = 4
+
 
 #return codes
 OK          = 'OK: '
@@ -73,7 +78,7 @@ def register_client(msg_request, client_socket):
     elif name in user_infos: 
         msg_reply = NOT_OK + REG_USED + "\n"
     else:
-        user_infos[name] = [client_socket, FREE, NULL]
+        user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0]
         msg_reply = OK + REG_OK + "\n"
 
     return msg_reply
@@ -122,7 +127,8 @@ def show_status(client_socket):
     return msg_reply
 
 
-def invite(msg_request, client_socket):
+def invite(msg_request, client_socket): # pode convidar se a si proprio lol
+    # ver se o user existe senao crasha
     dst_name = msg_request[ARGUMENT]
     user_infos[dst_name][STATUS] = BUSY
     invited_socket = find_name(dst_name)
@@ -137,7 +143,7 @@ def invite(msg_request, client_socket):
     return msg_reply
 
 
-def update_user_infos(accepted, client_socket):
+def update_user_infos(accepted, client_socket): # fazer jogo um objeto separado, para dar para jogar varios
     src_name = find_addr(client_socket)
     dst_addr = find_name(user_infos[src_name][INVITED])
     dst_name = find_addr(dst_addr)
@@ -145,7 +151,11 @@ def update_user_infos(accepted, client_socket):
     print(accepted)
     if accepted == "Y":
         user_infos[src_name][STATUS] = PLAYING # mudar todos if else para este formato?
+        user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] # quem aceita fica com o INGAME de quem convidou
+        user_infos[src_name][SYMBOL] = 'x'
         user_infos[dst_name][STATUS] = PLAYING
+        user_infos[dst_name][INVITED] = src_name # tem de ser depois de comeCar pq senao ele poderia fazer INVITE P1 e logo asseguir Y
+        user_infos[dst_name][SYMBOL] = 'o'
         msg_reply = OK + ACCEPT
         server_reply = OK + ACCEPTED
     else:
@@ -156,6 +166,46 @@ def update_user_infos(accepted, client_socket):
     server_reply = server_reply.encode()
     dst_addr.send(server_reply)
     return msg_reply
+
+
+def play_space(position, client_socket):
+    msg_reply = OK + ACK
+    position = int(position) # da erro com 0, fica como se fosse um 9
+    if (0 < position < 10): 
+        position -= 1
+        line = position // NUMBER_OF_POSITIONS
+        column = position % NUMBER_OF_POSITIONS
+        mapa = get_map(client_socket)
+        simbolo = get_symbol(client_socket)
+        mapa[line][column] = simbolo
+        show_map(client_socket)
+    return OK + ACK
+
+
+
+def get_map(client_socket):
+    name = find_addr(client_socket)
+    mapa = user_infos[name][INGAME]
+    return mapa
+
+def get_symbol(client_socket):
+    name = find_addr(client_socket)
+    simbolo = user_infos[name][SYMBOL]
+    return simbolo
+
+
+def show_map(client_socket):
+    mapa = get_map(client_socket)
+
+    print(str(mapa[0][0]) + "|" + str(mapa[0][1]) + "|" + str(mapa[0][2]))
+    #print("___")
+    print(str(mapa[1][0]) + "|" + str(mapa[1][1]) + "|" + str(mapa[1][2]))
+    #rint("___")
+    print(str(mapa[2][0]) + "|" + str(mapa[2][1]) + "|" + str(mapa[2][2]))
+
+    return
+
+
 
 def invalid_msg(msg_request):
   respond_msg = "INVALID MESSAGE\n"
@@ -170,6 +220,7 @@ def exit_session(client_socket):
 
 
 def server_function(client_socket):
+    # meter aqui variaveis tipo nome, que devem ser locais
     while True:
         client_msg = client_socket.recv(MSG_SIZE)
         print(client_msg.decode())
@@ -189,6 +240,10 @@ def server_function(client_socket):
             client_name = find_addr(client_socket)
             if user_infos[client_name][STATUS] == BUSY:
                 server_msg = update_user_infos(command.upper(), client_socket)
+        elif(command == "PLACE"):
+            client_name = find_addr(client_socket)
+            if user_infos[client_name][STATUS] == PLAYING:
+                server_msg = play_space(msg_request[ARGUMENT], client_socket)
         elif(command == "EXIT"):
             server_msg = exit_session(client_socket)
             server_msg = msg_reply.encode()
@@ -218,3 +273,8 @@ while True:
     cliente = threading.Thread(target=server_function, args = (client_sock,))
     threads.append(cliente)
     cliente.start()
+
+
+
+# jogos guardados numa lista, jogo guarda os players e os seus simbolos, 
+# podes fazer quit para voltar para o cmd, SHOWGAMES e ENTER NUM pa voltar
