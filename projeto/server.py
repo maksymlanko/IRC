@@ -25,6 +25,7 @@ STATUS  = 1
 INVITED = 2
 INGAME  = 3
 SYMBOL  = 4
+TURN    = 5
 
 
 #return codes
@@ -51,6 +52,10 @@ ACCEPT      = 'you are in a game now!'
 ACCEPTED    = 'you are in a game now!'
 DECLINE     = 'you declined the game invite'
 DECLINED    = 'the player declined your invite'
+BAD_PLAY    = 'Please PLACE in 1-9'
+WRONG_TURN  = 'It\'s not your turn!'
+YOUR_TURN   = 'It\'s your turn to play!'
+BAD_PLACE    = 'That position is already filled!'
 #GAME        = 'game has started'
 
 #generic functions
@@ -78,7 +83,8 @@ def register_client(msg_request, client_socket):
     elif name in user_infos: 
         msg_reply = NOT_OK + REG_USED + "\n"
     else:
-        user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0]
+        #user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0]
+        user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0, 0]
         msg_reply = OK + REG_OK + "\n"
 
     return msg_reply
@@ -153,10 +159,12 @@ def update_user_infos(accepted, client_socket): # fazer jogo um objeto separado,
         user_infos[src_name][STATUS] = PLAYING # mudar todos if else para este formato?
         user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] # quem aceita fica com o INGAME de quem convidou
         user_infos[src_name][SYMBOL] = 'x'
+        user_infos[src_name][TURN] = 1
         user_infos[dst_name][STATUS] = PLAYING
         user_infos[dst_name][INVITED] = src_name # tem de ser depois de comeCar pq senao ele poderia fazer INVITE P1 e logo asseguir Y
         user_infos[dst_name][SYMBOL] = 'o'
-        msg_reply = OK + ACCEPT
+        user_infos[dst_name][SYMBOL] = 0
+        msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
         server_reply = OK + ACCEPTED
     else:
         user_infos[src_name][STATUS] = FREE
@@ -169,19 +177,40 @@ def update_user_infos(accepted, client_socket): # fazer jogo um objeto separado,
 
 
 def play_space(position, client_socket):
-    msg_reply = OK + ACK
+    msg_reply = NOT_OK + WRONG_TURN
     position = int(position) # da erro com 0, fica como se fosse um 9
-    if (0 < position < 10): 
-        position -= 1
-        line = position // NUMBER_OF_POSITIONS
-        column = position % NUMBER_OF_POSITIONS
-        mapa = get_map(client_socket)
-        simbolo = get_symbol(client_socket)
-        mapa[line][column] = simbolo
-        show_map(client_socket)
-    return OK + ACK
+    name = find_addr(client_socket)
+    turn = user_infos[name][TURN]
+    dst_addr = find_name(user_infos[name][INVITED])
+    dst_name = find_addr(dst_addr)
+    if turn == 1:
+        if (0 < position < 10): 
+            position -= 1
+            line = position // NUMBER_OF_POSITIONS
+            column = position % NUMBER_OF_POSITIONS
+            mapa = get_map(client_socket)
+            simbolo = get_symbol(client_socket)
+            if mapa[line][column] == ' ':
+                mapa[line][column] = simbolo
+                str_mapa = show_map(client_socket)
+                msg_reply = OK + ACK + '\n' + str_mapa
+                change_turn(name)
+                str_mapa = '\n' + str_mapa
+                server_reply = str_mapa.encode()
+                dst_addr.send(server_reply)
+            else:
+                msg_reply = NOT_OK + BAD_PLACE
+        else:
+            msg_reply = NOT_OK + BAD_PLAY
+    return msg_reply
 
 
+def change_turn(name):
+    dst_addr = find_name(user_infos[name][INVITED])
+    dst_name = find_addr(dst_addr)
+    user_infos[name][TURN] = 0
+    user_infos[dst_name][TURN] = 1
+    return
 
 def get_map(client_socket):
     name = find_addr(client_socket)
@@ -197,13 +226,13 @@ def get_symbol(client_socket):
 def show_map(client_socket):
     mapa = get_map(client_socket)
 
-    print(str(mapa[0][0]) + "|" + str(mapa[0][1]) + "|" + str(mapa[0][2]))
-    #print("___")
-    print(str(mapa[1][0]) + "|" + str(mapa[1][1]) + "|" + str(mapa[1][2]))
-    #rint("___")
-    print(str(mapa[2][0]) + "|" + str(mapa[2][1]) + "|" + str(mapa[2][2]))
+    msg_reply = (str(mapa[0][0]) + "|" + str(mapa[0][1]) + "|" + str(mapa[0][2])) + '\n'
+    #print("---")
+    msg_reply += (str(mapa[1][0]) + "|" + str(mapa[1][1]) + "|" + str(mapa[1][2])) + '\n'
+    #print("---")
+    msg_reply += (str(mapa[2][0]) + "|" + str(mapa[2][1]) + "|" + str(mapa[2][2]))
 
-    return
+    return msg_reply
 
 
 
