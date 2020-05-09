@@ -55,7 +55,9 @@ DECLINED    = 'the player declined your invite'
 BAD_PLAY    = 'Please PLACE in 1-9'
 WRONG_TURN  = 'It\'s not your turn!'
 YOUR_TURN   = 'It\'s your turn to play!'
-BAD_PLACE    = 'That position is already filled!'
+BAD_PLACE   = 'That position is already filled!'
+WIN         = 'You win!'
+LOSE        = 'You lose!'
 #GAME        = 'game has started'
 
 #generic functions
@@ -168,6 +170,7 @@ def update_user_infos(accepted, client_socket): # fazer jogo um objeto separado,
         server_reply = OK + ACCEPTED
     else:
         user_infos[src_name][STATUS] = FREE
+        user_infos[src_name][INVITED] = NULL
         user_infos[dst_name][STATUS] = FREE
         msg_reply = OK + DECLINE
         server_reply = OK + DECLINED
@@ -176,7 +179,7 @@ def update_user_infos(accepted, client_socket): # fazer jogo um objeto separado,
     return msg_reply
 
 
-def play_space(position, client_socket):
+def play_space(position, client_socket): #da erro se n for int
     msg_reply = NOT_OK + WRONG_TURN
     position = int(position) # da erro com 0, fica como se fosse um 9
     name = find_addr(client_socket)
@@ -194,6 +197,11 @@ def play_space(position, client_socket):
                 mapa[line][column] = simbolo
                 str_mapa = show_map(client_socket)
                 msg_reply = OK + ACK + '\n' + str_mapa
+                winner = check_win(name)
+                if winner:
+                    end_game(winner)
+                    msg_reply = OK + WIN
+                    return msg_reply
                 change_turn(name)
                 str_mapa = '\n' + str_mapa
                 server_reply = str_mapa.encode()
@@ -203,6 +211,83 @@ def play_space(position, client_socket):
         else:
             msg_reply = NOT_OK + BAD_PLAY
     return msg_reply
+
+def end_game(winner):
+    dst_name = user_infos[winner][INVITED]
+    dst_addr = user_infos[dst_name][SOCKET]
+    reset(winner)
+    reset(dst_name)
+    server_reply = LOSE
+    server_reply =server_reply.encode()
+    dst_addr.send(server_reply)
+
+
+def reset(name):
+    user_infos[name][STATUS] = FREE
+    user_infos[name][INVITED] = NULL
+    user_infos[name][INGAME] = [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']]
+    user_infos[name][SYMBOL] = 0
+    user_infos[name][TURN] = 0
+
+
+
+def check_win(name):
+    mapa = user_infos[name][INGAME]
+    symbols = ['x','o']
+    for i in range(2):
+        winner = check_horizontal(name, symbols[i])
+        if winner:
+            return winner
+        winner = check_vertical(name, symbols[i])
+        if winner:
+            return winner
+        winner = check_special(name, symbols[i])
+        if winner:
+            return winner
+
+
+def check_horizontal(name, symbol):
+    mapa = user_infos[name][INGAME]
+    for i in range(3):
+        count = 0
+        for j in range(3):
+            if mapa[i][j] == symbol:
+                count += 1
+            if count == 3:
+                return check_winner(name, symbol)
+
+def check_vertical(name, symbol):
+    mapa = user_infos[name][INGAME]
+    for j in range(3):
+        count = 0
+        for i in range(3):
+            if mapa[i][j] == symbol:
+                count += 1
+            if count == 3:
+                return check_winner(name, symbol)
+
+def check_special(name, symbol):
+    mapa = user_infos[name][INGAME]
+    count = 0
+    for i in range(3): # esquerda pa direita
+        if mapa[i][i] == symbol:
+            count += 1
+        if count == 3:
+            return check_winner(name, symbol)
+    count = 0
+    for i in range(3): #direita para a esquerda
+        if mapa[i][2-i] == symbol:
+            count += 1
+        if count == 3:
+            return check_winner(name, symbol)
+
+
+def check_winner(name, symbol):
+    if user_infos[name][SYMBOL] == symbol:
+        return name
+    else:
+        return user_infos[name][INVITED]
+
 
 
 def change_turn(name):
@@ -271,8 +356,9 @@ def server_function(client_socket):
                 server_msg = update_user_infos(command.upper(), client_socket)
         elif(command == "PLACE"):
             client_name = find_addr(client_socket)
-            if user_infos[client_name][STATUS] == PLAYING:
-                server_msg = play_space(msg_request[ARGUMENT], client_socket)
+            if user_infos[client_name][STATUS] != PLAYING:
+                server_msg = invalid_msg(msg_request)
+            server_msg = play_space(msg_request[ARGUMENT], client_socket)
         elif(command == "EXIT"):
             server_msg = exit_session(client_socket)
             server_msg = msg_reply.encode()
