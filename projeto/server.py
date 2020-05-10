@@ -1,6 +1,6 @@
 import socket
 import threading
-
+import sys
 
 # Recebe no porto SERVER PORT os comandos "IAM <nome>", "HELLO",
 #    "HELLOTO <nome>" ou "KILLSERVER"
@@ -329,47 +329,56 @@ def invalid_msg(msg_request):
 
 def exit_session(client_socket):
     name = find_addr(client_socket)
-    del user_infos[name]
-    return EXIT.encode()
+    try:
+        del user_infos[name]
+    except KeyError:
+        return EXIT
+    return EXIT
 
 
 def server_function(client_socket):
     # meter aqui variaveis tipo nome, que devem ser locais
     while True:
         client_msg = client_socket.recv(MSG_SIZE)
-        print(client_msg.decode())
+        #print(client_msg.decode()) #debug
         msg_request = client_msg.decode().split()
-        command = msg_request[COMMAND]
-        if(command == "IAM"): # se command 2 for NULL breaka
-            server_msg = register_client(msg_request, client_socket)
-        elif(command == "HELLO"):
-            server_msg = reply_hello(client_socket)
-        elif(command == "HELLOTO"):
-            server_msg = forward_hello(msg_request, client_socket)
-        elif(command == "LIST"):
-            server_msg = show_status(client_socket)
-        elif(command == "INVITE"):
-            server_msg = invite(msg_request, client_socket)
-        elif(command.upper() == "Y" or command.upper() == "N"):
-            client_name = find_addr(client_socket)
-            if user_infos[client_name][STATUS] == BUSY:
-                server_msg = update_user_infos(command.upper(), client_socket)
-        elif(command == "PLACE"):
-            client_name = find_addr(client_socket)
-            if user_infos[client_name][STATUS] != PLAYING:
-                server_msg = invalid_msg(msg_request)
-            server_msg = play_space(msg_request[ARGUMENT], client_socket)
-        elif(command == "EXIT"):
-            server_msg = exit_session(client_socket)
-            server_msg = msg_reply.encode()
-            client_socket.send(server_msg)
-            break
+        try:
+            command = msg_request[COMMAND]
+            print(command)
+        except IndexError:
+            server_msg = "Nao podes fazer isso"
         else:
-            server_msg = invalid_msg(msg_request)
-        #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
+            if(command == "IAM"): # se command 2 for NULL breaka
+                server_msg = register_client(msg_request, client_socket)
+            elif(command == "HELLO"):
+                server_msg = reply_hello(client_socket)
+            elif(command == "HELLOTO"):
+                server_msg = forward_hello(msg_request, client_socket)
+            elif(command == "LIST"):
+                server_msg = show_status(client_socket)
+            elif(command == "INVITE"):
+                server_msg = invite(msg_request, client_socket)
+            elif(command.upper() == "Y" or command.upper() == "N"):
+                client_name = find_addr(client_socket)
+                if user_infos[client_name][STATUS] == BUSY:
+                    server_msg = update_user_infos(command.upper(), client_socket)
+            elif(command == "PLACE"):
+                client_name = find_addr(client_socket)
+                if user_infos[client_name][STATUS] != PLAYING:
+                    server_msg = invalid_msg(msg_request)
+                server_msg = play_space(msg_request[ARGUMENT], client_socket)
+            elif(command == "EXIT"):
+                server_msg = exit_session(client_socket)
+                server_msg = server_msg.encode()
+                client_socket.send(server_msg)
+                break
+            else:
+                server_msg = invalid_msg(msg_request)
+            #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
         server_msg = server_msg.encode()
         client_socket.send(server_msg)
     client_socket.close()
+    sys.exit()
 
 
 #main code

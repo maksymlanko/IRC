@@ -1,8 +1,10 @@
 import socket
 import sys
 import select
+from signal import signal, SIGINT
 
 EXIT        = 'you have ended your session'
+EXITING     = 'EXIT'
 
 
 #sockets communication parameters
@@ -18,6 +20,20 @@ client_sock.connect((SERVER_IP, SERVER_PORT))
 inputs = [client_sock, sys.stdin]
 
 
+def handler(signal_received, frame):
+    client_msg = EXITING
+    client_msg = client_msg.encode()
+    client_sock.send(client_msg)
+    print('SIGINT or CTRL-C detected. Exiting gracefully')
+    server_msg = client_sock.recv(MSG_SIZE)
+    server_request = server_msg.decode()
+    print("Message received from server:", server_request)
+    if server_request == EXIT:
+        exit()
+    
+
+signal(SIGINT, handler)
+
 while True:
   print('Input message to server: ')
   ins, outs, exs = select.select(inputs,[],[])
@@ -27,7 +43,6 @@ while True:
     if i == sys.stdin:
         user_msg = sys.stdin.readline()
         client_msg = user_msg.encode()
-        #client_sock.sendto(client_msg,(SERVER_IP,SERVER_PORT))
         client_sock.send(client_msg)
     # i == sock - o servidor enviou uma mensagem para o socket
     elif i == client_sock:
