@@ -48,8 +48,8 @@ NOT_OK      = 'ERROR: '
 
 #return sub-codes
 REG_OK      = 'client successfully registered'
-REG_UPDATED = 'client registration updated'
-REG_NOT_OK  = 'client unsuccessfully registered'
+REG_UPDATED = 'client registration updated'             # NAO USADA
+REG_NOT_OK  = 'client unsuccessfully registered'        # NAO USADA
 INV_CLIENT  = 'client is not registered' # invalid client
 INV_SESSION = 'client has no user_infos session'  #no user_infos session for the client"
 INV_MSG     = 'invalid message type'
@@ -157,7 +157,7 @@ def invite(msg_request, client_socket): # pode convidar se a si proprio lol
     dst_name = msg_request[ARGUMENT]
     invited_socket = find_name(dst_name)
     src_name = find_addr(client_socket)
-    
+
     if invited_socket == NULL:              # se o convidado nao existe
         msg_reply = NOT_OK + NO_USER + '\n'
 
@@ -169,7 +169,7 @@ def invite(msg_request, client_socket): # pode convidar se a si proprio lol
             user_infos[dst_name][STATUS] = BUSY
             user_infos[dst_name][INVITED] = src_name
             user_infos[src_name][STATUS] = BUSY
-            server_reply = " You have been invited to a game by: " + src_name + ". (Y/n)"
+            server_reply = " You have been invited to a game by: " + src_name + ". (Y/N)"
             server_reply = server_reply.encode() #fazer uma funcao auxiliar que faz estas 2 linhas depois
             invited_socket.send(server_reply)
             msg_reply = OK + ACK + '\n'
@@ -365,6 +365,11 @@ def exit_session(client_socket):
         return EXIT
     return EXIT
 
+def verify_msg_request(msg_request, size):
+    if len(msg_request) > size:
+        server_msg = NOT_OK + INV_MSG + '\n'
+        return server_msg   
+    return NULL
 
 def server_function(client_socket):
     # meter aqui variaveis tipo nome, que devem ser locais
@@ -376,10 +381,10 @@ def server_function(client_socket):
             command = msg_request[COMMAND]
             print(command)
         except IndexError:
-            server_msg = "Nao podes fazer isso"
+            server_msg = NOT_OK + INV_MSG + '\n'
         else:
             if(command == "IAM"): # se command 2 for NULL breaka
-                if len(msg_request) == 1:
+                if (len(msg_request) == 1):
                     server_msg = NOT_OK + INV_MSG + '\n'
                 else:
                     server_msg = register_client(msg_request, client_socket)
@@ -387,8 +392,12 @@ def server_function(client_socket):
                 server_msg = reply_hello(client_socket)
             elif(command == "HELLOTO"):
                 server_msg = forward_hello(msg_request, client_socket)
+
             elif(command == "LIST"):
-                server_msg = show_status(client_socket)
+                server_msg  = verify_msg_request(msg_request, 0)
+                if not server_msg:
+                    server_msg = show_status(client_socket)
+
             elif(command == "INVITE"):
                 if (len(msg_request) == 1):
                     server_msg = NOT_OK + INV_MSG + '\n'
@@ -399,15 +408,21 @@ def server_function(client_socket):
                 if user_infos[client_name][STATUS] == BUSY:
                     server_msg = update_user_infos(command.upper(), client_socket)
             elif(command == "PLACE"):
-                client_name = find_addr(client_socket)
-                if user_infos[client_name][STATUS] != PLAYING:
-                    server_msg = invalid_msg(msg_request)
-                server_msg = play_space(msg_request[ARGUMENT], client_socket)
+                if (len(msg_request) == 1):
+                    server_msg = NOT_OK + INV_MSG + '\n'
+                else:
+                    client_name = find_addr(client_socket)
+                    if user_infos[client_name][STATUS] != PLAYING:
+                        server_msg = invalid_msg(msg_request)
+                    server_msg = play_space(msg_request[ARGUMENT], client_socket)
             elif(command == "EXIT"):
-                server_msg = exit_session(client_socket)
-                server_msg = server_msg.encode()
-                client_socket.send(server_msg)
-                break
+                if (len(msg_request) != 1):
+                    server_msg = NOT_OK + INV_MSG + '\n'
+                else:
+                    server_msg = exit_session(client_socket)
+                    server_msg = server_msg.encode()
+                    client_socket.send(server_msg)
+                    break
             else:
                 server_msg = invalid_msg(msg_request)
             #server_sock.sendto(server_msg, (client_addr, SERVER_PORT))
