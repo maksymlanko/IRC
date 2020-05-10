@@ -2,6 +2,20 @@ import socket
 import threading
 import sys
 
+
+#############################################
+#              AVAILABLE COMMANDS           # 
+# REGISTER <name>                           #
+# PLAYERLIST                                #
+# INVITE <name>                             #
+# YES / NO                                  #           
+# PLACE <p>                                 #
+# EXIT                                      #
+# HELP                                      #
+# ###########################################
+
+
+
 # Recebe no porto SERVER PORT os comandos "IAM <nome>", "HELLO",
 #    "HELLOTO <nome>" ou "KILLSERVER"
 # "IAM <nome>" - regista um cliente como <nome>
@@ -58,31 +72,34 @@ YOUR_TURN   = 'It\'s your turn to play!'
 BAD_PLACE   = 'That position is already filled!'
 WIN         = 'You win!'
 LOSE        = 'You lose!'
+NOT_REGISTED = 'You aren\'t registered'
 #GAME        = 'game has started'
 
 #generic functions
 
+#procura o endereco dado nos existentes
 def find_addr (addr): # pede addr
     for key, val in list(user_infos.items()):
         if val[SOCKET] == addr:
             return key
     return NULL
 
+#procura o nome dado nos registados
 def find_name(name): # pede name
     for key, val in list(user_infos.items()):
         if key == name:
             return user_infos[name][SOCKET]
     return NULL
 
-
+#funcao que efetua o registo do cliente descrito nos parametros
 def register_client(msg_request, client_socket):
     name = msg_request[ARGUMENT]
     msg_reply = NOT_OK + NOTHING + "\n"
     client_name = find_addr(client_socket)
 
-    if (client_name != NULL):
+    if (client_name != NULL):                 # cliente ja tem sessao
         msg_reply = NOT_OK + HAS_SESSION + client_name + "\n"
-    elif name in user_infos: 
+    elif name in user_infos:                    # nome ja existe noutro cliente
         msg_reply = NOT_OK + REG_USED + "\n"
     else:
         #user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0]
@@ -120,7 +137,7 @@ def forward_hello(msg_request, client_socket):
 
     return msg_reply
 
-
+#funcao que lista os estados de todos os utilzadores
 def show_status(client_socket):
     msg_reply = OK + '\n'
     for key, val in list(user_infos.items()): #fazer funcao
@@ -135,50 +152,65 @@ def show_status(client_socket):
     return msg_reply
 
 
+#funcao que trata dos convites para jogos
 def invite(msg_request, client_socket): # pode convidar se a si proprio lol
-    # ver se o user existe senao crasha
     dst_name = msg_request[ARGUMENT]
-    user_infos[dst_name][STATUS] = BUSY
     invited_socket = find_name(dst_name)
     src_name = find_addr(client_socket)
-    user_infos[dst_name][INVITED] = src_name
-    user_infos[src_name][STATUS] = BUSY
-    server_reply = " You have been invited to a game by: " + src_name + ". (Y/n)"
-    server_reply = server_reply.encode() #fazer uma funcao auxiliar que faz estas 2 linhas depois
-    invited_socket.send(server_reply)
-    msg_reply = OK + ACK + '\n'
+    
+    if invited_socket == NULL:              # se o convidado nao existe
+        msg_reply = NOT_OK + NO_USER + '\n'
+
+    elif src_name == NULL:                  # se quem está a convidar nao esta registado
+        msg_reply = NOT_OK + NOT_REGISTED + '\n'
+
+    else:
+        if user_infos[dst_name][STATUS] == FREE:
+            user_infos[dst_name][STATUS] = BUSY
+            user_infos[dst_name][INVITED] = src_name
+            user_infos[src_name][STATUS] = BUSY
+            server_reply = " You have been invited to a game by: " + src_name + ". (Y/n)"
+            server_reply = server_reply.encode() #fazer uma funcao auxiliar que faz estas 2 linhas depois
+            invited_socket.send(server_reply)
+            msg_reply = OK + ACK + '\n'
+        else:
+            msg_reply = NOT_OK + BUSY + '\n'
 
     return msg_reply
 
 
 def update_user_infos(accepted, client_socket): # fazer jogo um objeto separado, para dar para jogar varios
-    src_name = find_addr(client_socket)
+    src_name = find_addr(client_socket)         #src é o convidado
     dst_addr = find_name(user_infos[src_name][INVITED])
-    dst_name = find_addr(dst_addr)
+    dst_name = find_addr(dst_addr)         
     print(dst_name)
     print(accepted)
-    if accepted == "Y":
-        user_infos[src_name][STATUS] = PLAYING # mudar todos if else para este formato?
+
+    if accepted == "Y":         #se o convite foi aceite passa ao estado PLAYING
+        user_infos[src_name][STATUS] = PLAYING 
         user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] # quem aceita fica com o INGAME de quem convidou
-        user_infos[src_name][SYMBOL] = 'x'
-        user_infos[src_name][TURN] = 1
+        user_infos[src_name][SYMBOL] = 'x'                          # simbolo do jogo
+        user_infos[src_name][TURN] = 1                              # primeiro a jogar
+        
         user_infos[dst_name][STATUS] = PLAYING
         user_infos[dst_name][INVITED] = src_name # tem de ser depois de comeCar pq senao ele poderia fazer INVITE P1 e logo asseguir Y
-        user_infos[dst_name][SYMBOL] = 'o'
+        user_infos[dst_name][SYMBOL] = 'o'  
         user_infos[dst_name][SYMBOL] = 0
+        
         msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
         server_reply = OK + ACCEPTED
-    else:
+    else:                   #se o convite foi recusado passa a FREE
         user_infos[src_name][STATUS] = FREE
         user_infos[src_name][INVITED] = NULL
         user_infos[dst_name][STATUS] = FREE
+        
         msg_reply = OK + DECLINE
         server_reply = OK + DECLINED
     server_reply = server_reply.encode()
     dst_addr.send(server_reply)
     return msg_reply
 
-
+#trata das jogadas
 def play_space(position, client_socket): #da erro se n for int
     msg_reply = NOT_OK + WRONG_TURN
     position = int(position) # da erro com 0, fica como se fosse um 9
@@ -228,7 +260,6 @@ def reset(name):
     user_infos[name][INGAME] = [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']]
     user_infos[name][SYMBOL] = 0
     user_infos[name][TURN] = 0
-
 
 
 def check_win(name):
@@ -287,7 +318,6 @@ def check_winner(name, symbol):
         return name
     else:
         return user_infos[name][INVITED]
-
 
 
 def change_turn(name):
@@ -349,7 +379,10 @@ def server_function(client_socket):
             server_msg = "Nao podes fazer isso"
         else:
             if(command == "IAM"): # se command 2 for NULL breaka
-                server_msg = register_client(msg_request, client_socket)
+                if len(msg_request) == 1:
+                    server_msg = NOT_OK + INV_MSG + '\n'
+                else:
+                    server_msg = register_client(msg_request, client_socket)
             elif(command == "HELLO"):
                 server_msg = reply_hello(client_socket)
             elif(command == "HELLOTO"):
@@ -357,7 +390,10 @@ def server_function(client_socket):
             elif(command == "LIST"):
                 server_msg = show_status(client_socket)
             elif(command == "INVITE"):
-                server_msg = invite(msg_request, client_socket)
+                if (len(msg_request) == 1):
+                    server_msg = NOT_OK + INV_MSG + '\n'
+                else:
+                    server_msg = invite(msg_request, client_socket)
             elif(command.upper() == "Y" or command.upper() == "N"):
                 client_name = find_addr(client_socket)
                 if user_infos[client_name][STATUS] == BUSY:
