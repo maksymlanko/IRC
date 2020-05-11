@@ -155,7 +155,7 @@ def show_status(client_socket):
 
 
 #funcao que trata dos convites para jogos
-def invite(dst_name, client_socket, src_name): # pode convidar se a si proprio lol
+def invite(dst_name, client_socket, src_name):
     """try:
         dst_name = msg_request[ARGUMENT]
     except IndexError:
@@ -167,7 +167,7 @@ def invite(dst_name, client_socket, src_name): # pode convidar se a si proprio l
     if src_name == NULL:                  # se quem está a convidar nao esta registado
         msg_reply = NOT_OK + INV_CLIENT + '\n'
 
-    elif dst_name == src_name:
+    elif dst_name == src_name:             # nao e possivel convidar-se a si proprio
         msg_reply = NOT_OK + YOURSELF + '\n'
     
     elif invited_socket == NULL:              # se o convidado nao existe
@@ -306,7 +306,7 @@ def check_vertical(name, symbol):
 def check_special(name, symbol):
     mapa = user_infos[name][INGAME]
     count = 0
-    for i in range(3): # esquerda pa direita
+    for i in range(3): # esquerda para a direita
         if mapa[i][i] == symbol:
             count += 1
         if count == 3:
