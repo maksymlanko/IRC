@@ -393,11 +393,9 @@ def server_function(client_socket):
         except IndexError:
             server_msg = NOT_OK + INV_MSG + '\n'
         else:
-            if command == "IAM":
-                server_msg = register_client(msg_request, client_socket)
-                client_name = find_addr(client_socket)
 
-            elif command == "LIST":
+
+            if command == "LIST":
                 server_msg = show_status(client_socket)
 
             elif command == "EXIT":
@@ -419,6 +417,10 @@ def server_function(client_socket):
 
                     elif command == "PLACE":
                         server_msg = play_space(arg, client_socket, client_name)
+
+                    elif command == "IAM":
+                        server_msg = register_client(msg_request, client_socket)
+                        client_name = find_addr(client_socket)
 
             else:
                 server_msg = invalid_msg(msg_request)
