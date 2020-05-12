@@ -194,19 +194,26 @@ def update_user_infos(accepted, client_socket, src_name): # fazer jogo um objeto
     dst_name = find_addr(dst_addr)         
 
     if accepted == "Y":         #se o convite foi aceite passa ao estado PLAYING
-        first = random.randint(0, 1)
+        first = random.randint(0, 1)        # escolhe de forma aleatoria o primeiro a jogar 
         user_infos[src_name][STATUS] = PLAYING 
         user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] # quem aceita fica com o INGAME de quem convidou
         user_infos[src_name][SYMBOL] = 'x'                          # simbolo do jogo
-        user_infos[src_name][TURN] = first                           # primeiro a jogar
+        user_infos[src_name][TURN] = first                             # primeiro a jogar
         
         user_infos[dst_name][STATUS] = PLAYING
         user_infos[dst_name][INVITED] = src_name # tem de ser depois de comeCar pq senao ele poderia fazer INVITE P1 e logo asseguir Y
         user_infos[dst_name][SYMBOL] = 'o'  
-        user_infos[dst_name][SYMBOL] = 1 - first
+        user_infos[dst_name][TURN] = 1- first
         
         msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
         server_reply = OK + ACCEPTED
+
+        if first == 1:
+            msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
+            server_reply = OK + ACCEPTED
+        else:
+            server_reply = OK + ACCEPT + '\n' + YOUR_TURN
+            msg_reply = OK + ACCEPTED
 
     else:                   #se o convite foi recusado passa a FREE
         user_infos[src_name][STATUS] = FREE
@@ -222,7 +229,10 @@ def update_user_infos(accepted, client_socket, src_name): # fazer jogo um objeto
 #trata das jogadas
 def play_space(position, client_socket, client_name): #da erro se n for int
     msg_reply = NOT_OK + NOT_GAME
-    if user_infos[client_name][STATUS] == PLAYING:
+    if client_name == NULL:                         # se o client nao estiver registado
+        msg_reply = NOT_OK + INV_SESSION + '\n'
+
+    elif user_infos[client_name][STATUS] == PLAYING:        # se o client nao estiver num jogo
         msg_reply = NOT_OK + WRONG_TURN
         try:
             position = int(position)
