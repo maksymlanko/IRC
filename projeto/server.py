@@ -194,7 +194,8 @@ def update_user_infos(accepted, client_socket, src_name): # fazer jogo um objeto
     dst_name = find_addr(dst_addr)         
 
     if accepted == "Y":         #se o convite foi aceite passa ao estado PLAYING
-        first = random.randint(0, 1)        # escolhe de forma aleatoria o primeiro a jogar 
+        first = random.randint(0, 1)
+        print(first)
         user_infos[src_name][STATUS] = PLAYING 
         user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] # quem aceita fica com o INGAME de quem convidou
         user_infos[src_name][SYMBOL] = 'x'                          # simbolo do jogo
@@ -203,10 +204,8 @@ def update_user_infos(accepted, client_socket, src_name): # fazer jogo um objeto
         user_infos[dst_name][STATUS] = PLAYING
         user_infos[dst_name][INVITED] = src_name # tem de ser depois de comeCar pq senao ele poderia fazer INVITE P1 e logo asseguir Y
         user_infos[dst_name][SYMBOL] = 'o'  
-        user_infos[dst_name][TURN] = 1- first
+        user_infos[dst_name][TURN] = 1 - first
         
-        msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
-        server_reply = OK + ACCEPTED
 
         if first == 1:
             msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
