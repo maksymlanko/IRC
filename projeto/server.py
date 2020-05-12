@@ -255,7 +255,7 @@ def play_space(position, client_socket, client_name): #da erro se n for int
                     win = check_win(mapa, line, column)
                     if win:
                         winner = check_winner(client_name, win) # preciso meter mutexes pq senao pode n verificar vitoria
-                        end_game(winner)
+                        end_game(winner, LOSE)
                         msg_reply = OK + WIN
                         return msg_reply
                     change_turn(client_name)
@@ -267,12 +267,12 @@ def play_space(position, client_socket, client_name): #da erro se n for int
                 msg_reply = NOT_OK + BAD_PLAY
     return msg_reply
 
-def end_game(winner):
+def end_game(winner, message):
     dst_name = user_infos[winner][INVITED]
     dst_addr = user_infos[dst_name][SOCKET]
     reset(winner)
     reset(dst_name)
-    server_reply = LOSE
+    server_reply = message
     fast_send(server_reply, dst_addr)
 
 
@@ -333,6 +333,9 @@ def invalid_msg(msg_request):
 
 def exit_session(client_socket): # falta ver se o cliente fizer ctrl+c a meio de um jogo..
     name = find_addr(client_socket)
+    if user_infos[name][STATUS] == PLAYING:             # exit durante uma partida
+        end_game(name, WIN);
+
     try:
         del user_infos[name]
     except KeyError:
