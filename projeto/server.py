@@ -1,6 +1,7 @@
 import socket
 import threading
 import sys
+import random
 
 
 #############################################
@@ -76,6 +77,7 @@ LOSE        = 'You lose!'
 NOT_REGISTED = 'You aren\'t registered'
 YOURSELF    = 'You can\'t invite yourself!'
 USE_ARG     = 'Use the format: COMMAND ARGUMENT'
+MUST_INT    = 'Argument must be an integer'
 #GAME        = 'game has started'
 
 #generic functions
@@ -155,7 +157,7 @@ def show_status(client_socket):
 
 
 #funcao que trata dos convites para jogos
-def invite(dst_name, client_socket, src_name):
+def invite(dst_name, client_socket, src_name): # pode convidar se a si proprio lol
     """try:
         dst_name = msg_request[ARGUMENT]
     except IndexError:
@@ -167,7 +169,7 @@ def invite(dst_name, client_socket, src_name):
     if src_name == NULL:                  # se quem está a convidar nao esta registado
         msg_reply = NOT_OK + INV_CLIENT + '\n'
 
-    elif dst_name == src_name:             # nao e possivel convidar-se a si proprio
+    elif dst_name == src_name:
         msg_reply = NOT_OK + YOURSELF + '\n'
     
     elif invited_socket == NULL:              # se o convidado nao existe
@@ -192,15 +194,16 @@ def update_user_infos(accepted, client_socket, src_name): # fazer jogo um objeto
     dst_name = find_addr(dst_addr)         
 
     if accepted == "Y":         #se o convite foi aceite passa ao estado PLAYING
+        first = random.randint(0, 1)
         user_infos[src_name][STATUS] = PLAYING 
         user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] # quem aceita fica com o INGAME de quem convidou
         user_infos[src_name][SYMBOL] = 'x'                          # simbolo do jogo
-        user_infos[src_name][TURN] = 1                              # primeiro a jogar
+        user_infos[src_name][TURN] = first                           # primeiro a jogar
         
         user_infos[dst_name][STATUS] = PLAYING
         user_infos[dst_name][INVITED] = src_name # tem de ser depois de comeCar pq senao ele poderia fazer INVITE P1 e logo asseguir Y
         user_infos[dst_name][SYMBOL] = 'o'  
-        user_infos[dst_name][SYMBOL] = 0
+        user_infos[dst_name][SYMBOL] = 1 - first
         
         msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
         server_reply = OK + ACCEPTED
@@ -221,28 +224,32 @@ def play_space(position, client_socket, client_name): #da erro se n for int
     msg_reply = NOT_OK + NOT_GAME
     if user_infos[client_name][STATUS] == PLAYING:
         msg_reply = NOT_OK + WRONG_TURN
-        position = int(position) # da erro com 0, fica como se fosse um 9
-        name = find_addr(client_socket)
-        turn = user_infos[name][TURN]
-        dst_addr = find_name(user_infos[name][INVITED])
+        try:
+            position = int(position)
+        except ValueError:
+            msg_reply = NOT_OK + MUST_INT
+            return msg_reply
+        turn = user_infos[client_name][TURN]
+        dst_addr = find_name(user_infos[client_name][INVITED])
         dst_name = find_addr(dst_addr)
         if turn == 1:
             if (0 < position < 10): 
                 position -= 1
                 line = position // NUMBER_OF_POSITIONS
                 column = position % NUMBER_OF_POSITIONS
-                mapa = get_map(client_socket)
-                simbolo = get_symbol(client_socket)
+                mapa = user_infos[client_name][INGAME]
+                simbolo = user_infos[client_name][SYMBOL]
                 if mapa[line][column] == ' ':
                     mapa[line][column] = simbolo
                     str_mapa = show_map(client_socket)
                     msg_reply = OK + ACK + '\n' + str_mapa
-                    winner = check_win(name)
-                    if winner:
+                    win = check_win(mapa, line, column)
+                    if win:
+                        winner = check_winner(client_name, win) # preciso meter mutexes pq senao pode n verificar vitoria
                         end_game(winner)
                         msg_reply = OK + WIN
                         return msg_reply
-                    change_turn(name)
+                    change_turn(client_name)
                     server_reply = '\n' + str_mapa
                     fast_send(server_reply, dst_addr)
                 else:
@@ -268,55 +275,15 @@ def reset(name):
     user_infos[name][TURN] = 0
 
 
-def check_win(name):
-    mapa = user_infos[name][INGAME]
-    symbols = ['x','o']
-    for i in range(2):
-        winner = check_horizontal(name, symbols[i])
-        if winner:
-            return winner
-        winner = check_vertical(name, symbols[i])
-        if winner:
-            return winner
-        winner = check_special(name, symbols[i])
-        if winner:
-            return winner
+def check_win(mapa, line, column):
+    if mapa[line][0] == mapa[line][1] == mapa[line][2] != ' ':
+        return mapa[line][0]
 
+    elif mapa[0][column] == mapa[1][column] == mapa[2][column] != ' ':
+        return mapa[0][column]
 
-def check_horizontal(name, symbol):
-    mapa = user_infos[name][INGAME]
-    for i in range(3):
-        count = 0
-        for j in range(3):
-            if mapa[i][j] == symbol:
-                count += 1
-            if count == 3:
-                return check_winner(name, symbol)
-
-def check_vertical(name, symbol):
-    mapa = user_infos[name][INGAME]
-    for j in range(3):
-        count = 0
-        for i in range(3):
-            if mapa[i][j] == symbol:
-                count += 1
-            if count == 3:
-                return check_winner(name, symbol)
-
-def check_special(name, symbol):
-    mapa = user_infos[name][INGAME]
-    count = 0
-    for i in range(3): # esquerda para a direita
-        if mapa[i][i] == symbol:
-            count += 1
-        if count == 3:
-            return check_winner(name, symbol)
-    count = 0
-    for i in range(3): #direita para a esquerda
-        if mapa[i][2-i] == symbol:
-            count += 1
-        if count == 3:
-            return check_winner(name, symbol)
+    elif mapa[0][0] == mapa[1][1] == mapa[2][2] != ' ' or mapa[0][2] == mapa[1][1] == mapa[2][0] != ' ':
+            return mapa[1][1]
 
 
 def check_winner(name, symbol):
@@ -338,23 +305,15 @@ def get_map(client_socket):
     mapa = user_infos[name][INGAME]
     return mapa
 
-def get_symbol(client_socket):
-    name = find_addr(client_socket)
-    simbolo = user_infos[name][SYMBOL]
-    return simbolo
-
 
 def show_map(client_socket):
     mapa = get_map(client_socket)
 
     msg_reply = (str(mapa[0][0]) + "|" + str(mapa[0][1]) + "|" + str(mapa[0][2])) + '\n'
-    #print("---")
     msg_reply += (str(mapa[1][0]) + "|" + str(mapa[1][1]) + "|" + str(mapa[1][2])) + '\n'
-    #print("---")
     msg_reply += (str(mapa[2][0]) + "|" + str(mapa[2][1]) + "|" + str(mapa[2][2]))
 
     return msg_reply
-
 
 
 def invalid_msg(msg_request):
@@ -363,7 +322,7 @@ def invalid_msg(msg_request):
   return msg_reply
 
 
-def exit_session(client_socket):
+def exit_session(client_socket): # falta ver se o cliente fizer ctrl+c a meio de um jogo..
     name = find_addr(client_socket)
     try:
         del user_infos[name]
@@ -371,11 +330,6 @@ def exit_session(client_socket):
         return EXIT
     return EXIT
 
-def verify_msg_request(msg_request, size):
-    if len(msg_request) > size:
-        server_msg = NOT_OK + INV_MSG + '\n'
-        return server_msg   
-    return NULL
 
 def fast_send(server_reply, dst_addr):
     server_reply = server_reply.encode()
@@ -394,11 +348,10 @@ def server_function(client_socket):
             server_msg = NOT_OK + INV_MSG + '\n'
         else:
 
-
             if command == "LIST":
                 server_msg = show_status(client_socket)
 
-            elif command == "EXIT":
+            elif command == "EXIT": 
                 server_msg = exit_session(client_socket)
                 fast_send(server_msg, client_socket)
                 break
@@ -406,11 +359,12 @@ def server_function(client_socket):
             elif command == "Y" or command == "N": # mudou para SO com maiusculas
                 server_msg = update_user_infos(command, client_socket, client_name)
 
-            elif command in ["INVITE", "PLACE"]: # nao gosto muito
+            elif command in ["INVITE", "PLACE", "IAM"]: # nao gosto muito
                 try:
                     arg = msg_request[ARGUMENT]
                 except IndexError:
                     server_msg = NOT_OK + USE_ARG
+
                 else:
                     if command == "INVITE":
                         server_msg = invite(arg, client_socket, client_name)
