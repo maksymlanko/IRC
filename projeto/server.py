@@ -41,6 +41,7 @@ INVITED = 2
 INGAME  = 3
 SYMBOL  = 4
 TURN    = 5
+INVITES = 6         # se for 1 convidou, se for 0 foi convidado
 
 
 #return codes
@@ -78,18 +79,19 @@ NOT_REGISTED = 'You aren\'t registered'
 YOURSELF    = 'You can\'t invite yourself!'
 USE_ARG     = 'Use the format: COMMAND ARGUMENT'
 MUST_INT    = 'Argument must be an integer'
+EXIT_INVITE = ' is not available anymore. The invitation has been canceled.'
 #GAME        = 'game has started'
 
 #generic functions
 
-#procura o endereco dado nos existentes
+#procura o endereco dado nos existentes e devolve o nome
 def find_addr (addr): # pede addr
     for key, val in list(user_infos.items()):
         if val[SOCKET] == addr:
             return key
     return NULL
 
-#procura o nome dado nos registados
+#procura o nome dado nos registados e devolve o addr
 def find_name(name): # pede name
     for key, val in list(user_infos.items()):
         if key == name:
@@ -107,7 +109,7 @@ def register_client(msg_request, client_socket):
     elif name in user_infos:                    # nome ja existe noutro cliente
         msg_reply = NOT_OK + REG_USED + "\n"
     else:
-        user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0, 0]
+        user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0, 0, 0]
         msg_reply = OK + REG_OK + "\n"
 
     return msg_reply
@@ -179,7 +181,10 @@ def invite(dst_name, client_socket, src_name): # pode convidar se a si proprio l
         if user_infos[dst_name][STATUS] == FREE:
             user_infos[dst_name][STATUS] = BUSY
             user_infos[dst_name][INVITED] = src_name
+            user_infos[dst_name][INVITES] = 2           # foi convidado
             user_infos[src_name][STATUS] = BUSY
+            user_infos[src_name][INVITES] = 1           # convidou
+            user_infos[src_name][INVITED] = dst_name
             server_reply = " You have been invited to a game by: " + src_name + ". (Y/N)"
             fast_send(server_reply, invited_socket)
             msg_reply = OK + ACK + '\n'
@@ -217,7 +222,10 @@ def update_user_infos(accepted, client_socket, src_name): # fazer jogo um objeto
     else:                   #se o convite foi recusado passa a FREE
         user_infos[src_name][STATUS] = FREE
         user_infos[src_name][INVITED] = NULL
+        user_infos[src_name][INVITES] = 0
         user_infos[dst_name][STATUS] = FREE
+        user_infos[dst_name][INVITED] = NULL
+        user_infos[dst_name][INVITES] = 0
         
         msg_reply = OK + DECLINE
         server_reply = OK + DECLINED
@@ -282,6 +290,7 @@ def reset(name):
     user_infos[name][INGAME] = [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']]
     user_infos[name][SYMBOL] = 0
     user_infos[name][TURN] = 0
+    user_infos[name][INVITES] = 0
 
 
 def check_win(mapa, line, column):
@@ -330,16 +339,35 @@ def invalid_msg(msg_request):
   msg_reply = NOT_OK + msg_request[COMMAND] + ' ' + INV_MSG + "\n"
   return msg_reply
 
+ # funcao auxiliar para quando o user que convida faz EXIT
+def update_inviting(client_name):              
+    dst_name = user_infos[client_name][INVITED]
+    dst_addr = find_name(dst_name)
 
-def exit_session(client_socket): # falta ver se o cliente fizer ctrl+c a meio de um jogo..
+    user_infos[dst_name][STATUS] = FREE
+    user_infos[dst_name][INVITED] = NULL
+    user_infos[dst_name][INVITES] = 0
+    server_reply = client_name + EXIT_INVITE
+    fast_send(server_reply, dst_addr)
+
+
+def exit_session(client_socket):
     name = find_addr(client_socket)
-    if user_infos[name][STATUS] == PLAYING:             # exit durante uma partida
-        end_game(name, WIN);
+
+    if user_infos[name][STATUS] == PLAYING:              # EXIT durante uma partida
+        end_game(name, WIN)
+
+    elif (user_infos[name][STATUS] == BUSY):       # EXIT ao ser convidado
+        update_user_infos("N", client_socket, name)
+
+   elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 1):        #EXIT ao convidar
+        update_user_infos("N", client_socket, name)
 
     try:
         del user_infos[name]
     except KeyError:
         return EXIT
+
     return EXIT
 
 
