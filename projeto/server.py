@@ -365,13 +365,7 @@ def update_inviting(client_name):
 
 def exit_session(client_socket):
     name = find_addr(client_socket)
-    try:
-        del user_infos[name]
-    except KeyError:
-        return EXIT
 
-    return EXIT
-"""
     if user_infos[name][STATUS] == PLAYING:              # EXIT durante uma partida
         end_game(name, WIN)
 
@@ -380,8 +374,13 @@ def exit_session(client_socket):
 
     elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 1):
         update_user_infos("N", client_socket, name)
-"""
 
+    try:
+        del user_infos[name]
+    except KeyError:
+        return EXIT
+
+    return EXIT
 
 
 def fast_send(server_reply, dst_addr):
