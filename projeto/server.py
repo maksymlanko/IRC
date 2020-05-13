@@ -3,13 +3,12 @@ import threading
 import sys
 import random
 
-
 #############################################
 #              AVAILABLE COMMANDS           # 
 # REGISTER <name>                           #
-# PLAYERLIST                                #
+# LIST                                      #
 # INVITE <name>                             #
-# YES / NO                                  #           
+# Y / N                                     #           
 # PLACE <p>                                 #
 # EXIT                                      #
 # HELP                                      #
@@ -81,6 +80,7 @@ USE_ARG     = 'Use the format: COMMAND ARGUMENT'
 MUST_INT    = 'Argument must be an integer'
 EXIT_INVITE = ' is not available anymore. The invitation has been canceled.'
 #GAME        = 'game has started'
+
 
 #generic functions
 
@@ -360,7 +360,7 @@ def exit_session(client_socket):
     elif (user_infos[name][STATUS] == BUSY):       # EXIT ao ser convidado
         update_user_infos("N", client_socket, name)
 
-   elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 1):        #EXIT ao convidar
+    elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 1):
         update_user_infos("N", client_socket, name)
 
     try:
@@ -376,7 +376,7 @@ def fast_send(server_reply, dst_addr):
     dst_addr.send(server_reply)
 
 
-def server_function(client_socket):
+def server_function(client_socket, lock):
     # meter aqui variaveis tipo nome, que devem ser locais
     client_name = NULL
     while True:
@@ -389,10 +389,14 @@ def server_function(client_socket):
         else:
 
             if command == "LIST":
+                lock.acquire();
                 server_msg = show_status(client_socket)
+                lock.release();
 
             elif command == "EXIT": 
+                lock.acquire();
                 server_msg = exit_session(client_socket)
+                lock.release();
                 fast_send(server_msg, client_socket)
                 break
 
@@ -434,12 +438,13 @@ server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # para depois 
 server_sock.bind(('', SERVER_PORT))
 server_sock.listen(5)
 
-
 while True:
     client_sock, client_addr = server_sock.accept()
-    cliente = threading.Thread(target=server_function, args = (client_sock,))
+    lock = threading.Lock()
+    cliente = threading.Thread(target=server_function, args = (client_sock, lock))
     threads.append(cliente)
     cliente.start()
+    cliente.join()
 
 
 
