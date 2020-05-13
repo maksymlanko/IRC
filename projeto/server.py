@@ -365,7 +365,13 @@ def update_inviting(client_name):
 
 def exit_session(client_socket):
     name = find_addr(client_socket)
+    try:
+        del user_infos[name]
+    except KeyError:
+        return EXIT
 
+    return EXIT
+"""
     if user_infos[name][STATUS] == PLAYING:              # EXIT durante uma partida
         end_game(name, WIN)
 
@@ -374,13 +380,8 @@ def exit_session(client_socket):
 
     elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 1):
         update_user_infos("N", client_socket, name)
+"""
 
-    try:
-        del user_infos[name]
-    except KeyError:
-        return EXIT
-
-    return EXIT
 
 
 def fast_send(server_reply, dst_addr):
@@ -406,6 +407,7 @@ def server_function(client_socket, lock):
             elif command == "EXIT": 
                 server_msg = exit_session(client_socket)
                 fast_send(server_msg, client_socket)
+                lock.release()
                 break
 
             elif command == "Y" or command == "N": # mudou para SO com maiusculas
@@ -434,7 +436,7 @@ def server_function(client_socket, lock):
         lock.release()
         fast_send(server_msg, client_socket)
     client_socket.close()
-    sys.exit(1)
+    sys.exit(0)
 
 
 #main code
