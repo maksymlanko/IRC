@@ -29,9 +29,10 @@ NULL = ''
 SERVER_PORT = 12100
 MSG_SIZE = 1024
 NUMBER_OF_POSITIONS = 3
+MAX_TURNS = 9
 
 #message info
-COMMAND = 0
+COMMAND  = 0
 ARGUMENT = 1
 
 SOCKET  = 0
@@ -40,8 +41,8 @@ INVITED = 2
 INGAME  = 3
 SYMBOL  = 4
 TURN    = 5
-INVITES = 6         # se for 1 convidou, se for 0 foi convidado
-
+INVITES = 6       
+NUM_TURN = 7
 
 #return codes
 OK          = 'OK: '
@@ -79,8 +80,8 @@ YOURSELF    = 'You can\'t invite yourself!'
 USE_ARG     = 'Use the format: COMMAND ARGUMENT'
 MUST_INT    = 'Argument must be an integer'
 EXIT_INVITE = ' is not available anymore. The invitation has been canceled.'
+DRAW        = 'Your game ended with a draw.'
 #GAME        = 'game has started'
-
 
 #generic functions
 
@@ -109,37 +110,8 @@ def register_client(msg_request, client_socket):
     elif name in user_infos:                    # nome ja existe noutro cliente
         msg_reply = NOT_OK + REG_USED + "\n"
     else:
-        user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0, 0, 0]
+        user_infos[name] = [client_socket, FREE, NULL, [[' ',' ',' '],[' ',' ',' '],[' ',' ',' ']], 0, 0, 0, [0]]
         msg_reply = OK + REG_OK + "\n"
-
-    return msg_reply
-
-
-def reply_hello(client_socket):
-    msg_reply = NOT_OK + INV_CLIENT + "\n"
-    dst_name = find_addr(client_socket)
-
-    if dst_name != NULL:
-        msg_reply = 'HELLO' + ' ' + dst_name + "\n"
-
-    return msg_reply
-
-
-def forward_hello(msg_request, client_socket):
-    dst_name = msg_request[ARGUMENT]
-    dst_addr = find_name(dst_name)
-    msg_reply = NOT_OK + INV_SESSION + "\n"
-    src_name =  find_addr(client_socket)
-
-    if src_name == NULL:
-        msg_reply = NOT_OK + INV_SESSION
-    elif dst_addr == NULL:
-        msg_reply = NO_USER + "\n"
-    else:
-        msg_reply = OK + ACK + "\n"
-        server_reply = 'HELLO'   + ' ' + dst_name + ' from ' + src_name + "\n"
-        server_reply = server_reply.encode()
-        dst_addr.send(server_reply)
 
     return msg_reply
 
@@ -159,7 +131,7 @@ def show_status(client_socket):
 
 
 #funcao que trata dos convites para jogos
-def invite(dst_name, client_socket, src_name): # pode convidar se a si proprio lol
+def invite(dst_name, client_socket, src_name):
     """try:
         dst_name = msg_request[ARGUMENT]
     except IndexError:
@@ -200,12 +172,12 @@ def update_user_infos(accepted, client_socket, src_name): # fazer jogo um objeto
 
     if accepted == "Y":         #se o convite foi aceite passa ao estado PLAYING
         first = random.randint(0, 1)
-        print(first)
         user_infos[src_name][STATUS] = PLAYING 
         user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] # quem aceita fica com o INGAME de quem convidou
         user_infos[src_name][SYMBOL] = 'x'                          # simbolo do jogo
         user_infos[src_name][TURN] = first                             # primeiro a jogar
-        
+        user_infos[src_name][NUM_TURN] = user_infos[dst_name][NUM_TURN]
+
         user_infos[dst_name][STATUS] = PLAYING
         user_infos[dst_name][INVITED] = src_name # tem de ser depois de comeCar pq senao ele poderia fazer INVITE P1 e logo asseguir Y
         user_infos[dst_name][SYMBOL] = 'o'  
@@ -258,6 +230,12 @@ def play_space(position, client_socket, client_name): #da erro se n for int
                 simbolo = user_infos[client_name][SYMBOL]
                 if mapa[line][column] == ' ':
                     mapa[line][column] = simbolo
+                    user_infos[client_name][NUM_TURN][0] = user_infos[client_name][NUM_TURN][0] + 1
+                    if user_infos[client_name][NUM_TURN][0] == MAX_TURNS:
+                        end_game(client_name, DRAW)
+                        msg_reply = OK + DRAW
+                        return msg_reply
+
                     str_mapa = show_map(client_socket)
                     msg_reply = OK + ACK + '\n' + str_mapa
                     win = check_win(mapa, line, column)
@@ -291,6 +269,7 @@ def reset(name):
     user_infos[name][SYMBOL] = 0
     user_infos[name][TURN] = 0
     user_infos[name][INVITES] = 0
+    user_infos[name][NUM_TURN] = [0]
 
 
 def check_win(mapa, line, column):
@@ -347,6 +326,7 @@ def update_inviting(client_name):
     user_infos[dst_name][STATUS] = FREE
     user_infos[dst_name][INVITED] = NULL
     user_infos[dst_name][INVITES] = 0
+    user_infos[dst_name][NUM_TURN] = [0]
     server_reply = client_name + EXIT_INVITE
     fast_send(server_reply, dst_addr)
 
@@ -357,11 +337,11 @@ def exit_session(client_socket):
     if user_infos[name][STATUS] == PLAYING:              # EXIT durante uma partida
         end_game(name, WIN)
 
-    elif (user_infos[name][STATUS] == BUSY):       # EXIT ao ser convidado
+    elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 2):       # EXIT ao ser convidado
         update_user_infos("N", client_socket, name)
 
-    elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 1):
-        update_user_infos("N", client_socket, name)
+    elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 1):       # EXIT ao convidar
+        update_inviting(name)
 
     try:
         del user_infos[name]
@@ -376,7 +356,7 @@ def fast_send(server_reply, dst_addr):
     dst_addr.send(server_reply)
 
 
-def server_function(client_socket, lock):
+def server_function(client_socket):
     # meter aqui variaveis tipo nome, que devem ser locais
     client_name = NULL
     while True:
@@ -387,16 +367,12 @@ def server_function(client_socket, lock):
         except IndexError:
             server_msg = NOT_OK + INV_MSG + '\n'
         else:
-
+            lock.acquire()
             if command == "LIST":
-                lock.acquire();
                 server_msg = show_status(client_socket)
-                lock.release();
 
             elif command == "EXIT": 
-                lock.acquire();
                 server_msg = exit_session(client_socket)
-                lock.release();
                 fast_send(server_msg, client_socket)
                 break
 
@@ -423,6 +399,7 @@ def server_function(client_socket, lock):
             else:
                 server_msg = invalid_msg(msg_request)
 
+        lock.release()
         fast_send(server_msg, client_socket)
     client_socket.close()
     sys.exit()
@@ -437,15 +414,13 @@ server_sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
 server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # para depois poder matar com ctrl+c
 server_sock.bind(('', SERVER_PORT))
 server_sock.listen(5)
+lock = threading.Lock()
 
 while True:
     client_sock, client_addr = server_sock.accept()
-    lock = threading.Lock()
-    cliente = threading.Thread(target=server_function, args = (client_sock, lock))
+    cliente = threading.Thread(target=server_function, args=(client_sock,))
     threads.append(cliente)
     cliente.start()
-    cliente.join()
-
 
 
 # jogos guardados numa lista, jogo guarda os players e os seus simbolos, 
