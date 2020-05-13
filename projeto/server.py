@@ -177,7 +177,7 @@ def update_user_infos(accepted, client_socket, src_name): # fazer jogo um objeto
         user_infos[src_name][SYMBOL] = 'x'                          # simbolo do jogo
         user_infos[src_name][TURN] = first                             # primeiro a jogar
         user_infos[src_name][NUM_TURN] = user_infos[dst_name][NUM_TURN]
-
+        
         user_infos[dst_name][STATUS] = PLAYING
         user_infos[dst_name][INVITED] = src_name # tem de ser depois de comeCar pq senao ele poderia fazer INVITE P1 e logo asseguir Y
         user_infos[dst_name][SYMBOL] = 'o'  
@@ -374,6 +374,7 @@ def server_function(client_socket):
             elif command == "EXIT": 
                 server_msg = exit_session(client_socket)
                 fast_send(server_msg, client_socket)
+                lock.release()
                 break
 
             elif command == "Y" or command == "N": # mudou para SO com maiusculas
@@ -402,7 +403,7 @@ def server_function(client_socket):
         lock.release()
         fast_send(server_msg, client_socket)
     client_socket.close()
-    sys.exit()
+    sys.exit(0)
 
 
 #main code
