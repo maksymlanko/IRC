@@ -6,23 +6,14 @@ from functions import *
 
 #############################################
 #              AVAILABLE COMMANDS           # 
-# REGISTER <name>                           #
+# IAM <name>                                #
 # LIST                                      #
 # INVITE <name>                             #
 # Y / N                                     #           
 # PLACE <p>                                 #
 # EXIT                                      #
-# HELP                                      #
 # ###########################################
 
-
-
-# Recebe no porto SERVER PORT os comandos "IAM <nome>", "HELLO",
-#    "HELLOTO <nome>" ou "KILLSERVER"
-# "IAM <nome>" - regista um cliente como <nome>
-# "HELLO" - responde HELLO <nome> se o cliente estiver registado
-# "HELLOTO <nome>" - envia HELLO para o cliente <nome>
-# "KILLSERVER" - mata o servidor
 
 #constants definition
 NULL = ''
@@ -36,18 +27,8 @@ MAX_TURNS = 9
 COMMAND  = 0
 ARGUMENT = 1
 
-#return codes
-OK          = 'OK: '
-NOT_OK      = 'ERROR: '
-
-#return sub-codes
-INV_MSG     = 'invalid message type'
-
-
-
-
+# funcao que trata dos pedidos do cliente dependendo do comando
 def server_function(client_socket):
-    # meter aqui variaveis tipo nome, que devem ser locais
     client_name = NULL
     while True:
         client_msg = client_socket.recv(MSG_SIZE)
@@ -67,10 +48,10 @@ def server_function(client_socket):
                 lock.release()
                 break
 
-            elif command == "Y" or command == "N": # mudou para SO com maiusculas
+            elif command == "Y" or command == "N": 
                 server_msg = update_user_infos(command, client_socket, client_name)
 
-            elif command in ["INVITE", "PLACE", "IAM"]: # nao gosto muito
+            elif command in ["INVITE", "PLACE", "IAM"]: 
                 try:
                     arg = msg_request[ARGUMENT]
                 except IndexError:
@@ -100,19 +81,15 @@ def server_function(client_socket):
 threads = []
 user_infos = {} #dict: key: user_name; val:user_address info: example:'maria'= ('127.0.0.1',17234)
 
-# programa inicial, nao e thread
+# programa inicial
 server_sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # para depois poder matar com ctrl+c
+server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) # para poder dar exit com ctrl+c
 server_sock.bind(('', SERVER_PORT))
 server_sock.listen(5)
 lock = threading.Lock()
 
 while True:
-    client_sock, client_addr = server_sock.accept()
-    cliente = threading.Thread(target=server_function, args=(client_sock,))
-    threads.append(cliente)
-    cliente.start()
-
-
-# jogos guardados numa lista, jogo guarda os players e os seus simbolos, 
-# podes fazer quit para voltar para o cmd, SHOWGAMES e ENTER NUM pa voltar
+    client_sock, client_addr = server_sock.accept()         
+    cliente = threading.Thread(target=server_function, args=(client_sock,))     #cria a thread
+    threads.append(cliente)         #adiciona a lista de threads
+    cliente.start()                 #inicia a thread do cliente

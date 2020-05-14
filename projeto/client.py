@@ -16,7 +16,7 @@ MSG_SIZE = 1024
 client_sock = socket.socket(socket.AF_INET,socket.SOCK_STREAM) # TCP
 
 client_sock.connect((SERVER_IP, SERVER_PORT))
-# o select quer ficar a espera de ler o socket e ler do stdin (consola)
+# o select quer ficar a espera de ler o socket e ler do stdin 
 inputs = [client_sock, sys.stdin]
 
 
