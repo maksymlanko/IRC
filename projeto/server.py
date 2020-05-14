@@ -35,8 +35,8 @@ def server_function(client_socket):
         msg_request = client_msg.decode().split()
         try:
             command = msg_request[COMMAND]
-        except IndexError:
-            server_msg = NOT_OK + INV_MSG + '\n'
+        except IndexError:                      # para ENTER nao matar o servidor
+            server_msg = NOT_OK + INV_MSG + '\n'   
         else:
             lock.acquire()
             if command == "LIST":
@@ -90,6 +90,6 @@ lock = threading.Lock()
 
 while True:
     client_sock, client_addr = server_sock.accept()         
-    cliente = threading.Thread(target=server_function, args=(client_sock,))     #cria a thread
+    cliente = threading.Thread(target=server_function, args=(client_sock,))  #cria a thread
     threads.append(cliente)         #adiciona a lista de threads
     cliente.start()                 #inicia a thread do cliente

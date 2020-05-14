@@ -123,7 +123,7 @@ def invite(dst_name, client_socket, src_name):
             user_infos[src_name][STATUS] = BUSY
             user_infos[src_name][INVITES] = 1           # convidou
             user_infos[src_name][INVITED] = dst_name
-            server_reply = " You have been invited to a game by: " + src_name + ". (Y/N)"
+            server_reply = OK + " You have been invited to a game by: " + src_name + ". (Y/N)"
             fast_send(server_reply, invited_socket)
             msg_reply = OK + ACK + '\n'
         else:
@@ -226,7 +226,7 @@ def end_game(winner, message):
     dst_addr = user_infos[dst_name][SOCKET]
     reset(winner)
     reset(dst_name)
-    server_reply = message
+    server_reply = OK + message
     fast_send(server_reply, dst_addr)
 
 # Funcao que limpa os atributos do cliente 
@@ -307,7 +307,10 @@ def update_inviting(client_name):
 def exit_session(client_socket):
     name = find_addr(client_socket)
 
-    if user_infos[name][STATUS] == PLAYING:              # EXIT durante uma partida
+    if name == NULL:
+        return EXIT
+
+    elif user_infos[name][STATUS] == PLAYING:              # EXIT durante uma partida
         end_game(name, WIN)
 
     elif (user_infos[name][STATUS] == BUSY) and (user_infos[name][INVITES] == 2):       # EXIT ao ser convidado
