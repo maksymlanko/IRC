@@ -53,6 +53,7 @@ LOSE        = 'You lose!'
 DRAW        = 'Your game ended with a draw.'
 USE_ARG     = 'Use the format: COMMAND ARGUMENT'
 MUST_INT    = 'Argument must be an integer'
+NOT_INVITED = 'You have not been invited to a game!'
 
 user_infos = {}
 
@@ -134,42 +135,49 @@ def invite(dst_name, client_socket, src_name):
 
 # Funcao que aturaliza informacoes dos clientes dependendo da resposta ao INVITE
 def update_user_infos(accepted, client_socket, src_name): 
-    dst_addr = find_name(user_infos[src_name][INVITED])
-    dst_name = find_addr(dst_addr)         
+    if src_name == NULL:
+        msg_reply = INV_CLIENT
+    elif user_infos[src_name][STATUS] == BUSY:
+        dst_addr = find_name(user_infos[src_name][INVITED])
+        dst_name = find_addr(dst_addr)        
 
-    if accepted == "Y":         #se o convite foi aceite passa ao estado PLAYING
-        first = random.randint(0, 1)
-        user_infos[src_name][STATUS] = PLAYING 
-        user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] 
-        user_infos[src_name][SYMBOL] = 'x'                          # simbolo do jogo
-        user_infos[src_name][TURN] = first                          
-        user_infos[src_name][NUM_TURN] = user_infos[dst_name][NUM_TURN]
-        
-        user_infos[dst_name][STATUS] = PLAYING
-        user_infos[dst_name][INVITED] = src_name 
-        user_infos[dst_name][SYMBOL] = 'o'  
-        user_infos[dst_name][TURN] = 1 - first
-        
+        if accepted == "Y":         #se o convite foi aceite passa ao estado PLAYING
+            first = random.randint(0, 1)
+            user_infos[src_name][STATUS] = PLAYING 
+            user_infos[src_name][INGAME] = user_infos[dst_name][INGAME] 
+            user_infos[src_name][SYMBOL] = 'x'                          # simbolo do jogo
+            user_infos[src_name][TURN] = first                          
+            user_infos[src_name][NUM_TURN] = user_infos[dst_name][NUM_TURN]
+            
+            user_infos[dst_name][STATUS] = PLAYING
+            user_infos[dst_name][INVITED] = src_name 
+            user_infos[dst_name][SYMBOL] = 'o'  
+            user_infos[dst_name][TURN] = 1 - first
+            
 
-        if first == 1:
-            msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
-            server_reply = OK + ACCEPTED
-        else:
-            server_reply = OK + ACCEPT + '\n' + YOUR_TURN
-            msg_reply = OK + ACCEPTED
+            if first == 1:
+                msg_reply = OK + ACCEPT + '\n' + YOUR_TURN
+                server_reply = OK + ACCEPTED
+            else:
+                server_reply = OK + ACCEPT + '\n' + YOUR_TURN
+                msg_reply = OK + ACCEPTED
 
-    else:                   #se o convite foi recusado passa a FREE
-        user_infos[src_name][STATUS] = FREE
-        user_infos[src_name][INVITED] = NULL
-        user_infos[src_name][INVITES] = 0
-        user_infos[dst_name][STATUS] = FREE
-        user_infos[dst_name][INVITED] = NULL
-        user_infos[dst_name][INVITES] = 0
-        
-        msg_reply = OK + DECLINE
-        server_reply = OK + DECLINED
+        else:                   #se o convite foi recusado passa a FREE
+            user_infos[src_name][STATUS] = FREE
+            user_infos[src_name][INVITED] = NULL
+            user_infos[src_name][INVITES] = 0
+            user_infos[dst_name][STATUS] = FREE
+            user_infos[dst_name][INVITED] = NULL
+            user_infos[dst_name][INVITES] = 0
+            
+            msg_reply = OK + DECLINE
+            server_reply = OK + DECLINED
+        fast_send(server_reply, dst_addr)
 
-    fast_send(server_reply, dst_addr)
+    else:
+        msg_reply = NOT_INVITED
+        return msg_reply
+
     return msg_reply
 
 #trata das jogadas
