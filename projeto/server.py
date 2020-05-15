@@ -41,6 +41,7 @@ def server_function(client_socket):
             lock.acquire()
             if command == "LIST":
                 server_msg = show_status(client_socket)
+                lock.release()
 
             elif command == "EXIT": 
                 server_msg = exit_session(client_socket)
@@ -50,28 +51,34 @@ def server_function(client_socket):
 
             elif command == "Y" or command == "N": 
                 server_msg = update_user_infos(command, client_socket, client_name)
+                lock.release()
 
             elif command in ["INVITE", "PLACE", "IAM"]: 
                 try:
                     arg = msg_request[ARGUMENT]
                 except IndexError:
                     server_msg = NOT_OK + USE_ARG
+                    lock.release()
 
                 else:
                     if command == "INVITE":
                         server_msg = invite(arg, client_socket, client_name)
+                        lock.release()
 
                     elif command == "PLACE":
                         server_msg = play_space(arg, client_socket, client_name)
+                        lock.release()
 
                     elif command == "IAM":
                         server_msg = register_client(msg_request, client_socket)
                         client_name = find_addr(client_socket)
+                        lock.release()
 
             else:
                 server_msg = invalid_msg(msg_request)
+                lock.release()
 
-        lock.release()
+        
         fast_send(server_msg, client_socket)
     client_socket.close()
     sys.exit(0)
